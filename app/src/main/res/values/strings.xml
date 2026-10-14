@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KipfelNav テスト</string>
+    <string name="service_name">KipfelNav 重ね描き(テスト)</string>
+    <string name="service_description">ナビゲーションバーとキーボードの上に、確認用の図形を重ねて描きます。タップはすべて下に素通りします。画面の内容は読み取りません。</string>
+</resources>
