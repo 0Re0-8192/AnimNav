@@ -179,9 +179,17 @@ class KipfelOverlayView extends View {
         invalidate();
     }
 
-    /** スワイプで出したバーが出ているあいだは、沈み始めを追いかけるために細かく見る。 */
-    boolean wantsFastPoll() {
+    /** スワイプで出したバーが出ているあいだ。沈み始めを追いかけるために、画面のコマごとに見る。 */
+    boolean trackingSwipeBar() {
         return windowOnly;
+    }
+
+    /**
+     * 全画面でナビバーが隠れているあいだ(バー自体はある)。スワイプでいつ出てきてもいいように、
+     * 最新のウィンドウ一覧を細かく取りに行く。
+     */
+    boolean waitingForSwipeBar() {
+        return !windowOnly && navFromMetrics == 0 && navFull > 0;
     }
 
     private void measureScreen(List<AccessibilityWindowInfo> windows) {

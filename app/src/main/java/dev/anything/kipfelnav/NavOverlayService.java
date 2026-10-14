@@ -8,6 +8,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.PixelFormat;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -28,7 +29,8 @@ public class NavOverlayService extends AccessibilityService {
 
     // 画面の状態(ナビバー・キーボード・ロック)を見る間隔。コマ送りは絵の側で時間から決める
     private static final long POLL_MS = 50;
-    private static final long FAST_POLL_MS = 16;
+    private static final long WAITING_POLL_MS = 33;  // 全画面でバーが隠れているあいだ
+    private static final long TRACKING_POLL_MS = 16; // スワイプで出したバーが出ているあいだ
     private static final int OVERLAY_HEIGHT_DP = 120;
     private static final int OVERLAY_HEIGHT_GUIDES_DP = 420; // ガイド表示中は確認用の文字を出すので高くする
 
@@ -43,8 +45,7 @@ public class NavOverlayService extends AccessibilityService {
         @Override
         public void run() {
             pollNow();
-            // スワイプで出したバーが出ているあいだは、画面のコマごとに見る
-            handler.postDelayed(this, overlay != null && overlay.wantsFastPoll() ? FAST_POLL_MS : POLL_MS);
+            handler.postDelayed(this, nextPollMs());
         }
     };
 
@@ -121,10 +122,27 @@ public class NavOverlayService extends AccessibilityService {
         }
     }
 
-    private void pollNow() {
-        if (overlay != null) {
-            overlay.poll(windows());
+    private long nextPollMs() {
+        if (overlay == null) {
+            return POLL_MS;
         }
+        if (overlay.trackingSwipeBar()) {
+            return TRACKING_POLL_MS;
+        }
+        return overlay.waitingForSwipeBar() ? WAITING_POLL_MS : POLL_MS;
+    }
+
+    private void pollNow() {
+        if (overlay == null) {
+            return;
+        }
+        // ウィンドウ一覧の変化は、Android からまとめて少し遅れて届き、それまでは手元の古い一覧が返る。
+        // スワイプで出るバーをすぐ拾うため、全画面のあいだは手元の一覧を捨てて最新を取りに行く
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && (overlay.trackingSwipeBar() || overlay.waitingForSwipeBar())) {
+            clearCache();
+        }
+        overlay.poll(windows());
     }
 
     /** 画面に出ているウィンドウの一覧(種類と位置を見るだけ)。取れなければ空。 */
