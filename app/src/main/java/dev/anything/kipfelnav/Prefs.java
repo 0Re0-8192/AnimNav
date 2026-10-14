@@ -1,0 +1,60 @@
+package dev.anything.kipfelnav;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+/**
+ * 位置合わせの設定。閉じた画面(cover)と開いた画面(main)で別々に持つ。
+ * 位置は画面の幅に対する割合なので、回転しても追従する。
+ * 初期値は Galaxy Z Fold7 + NavStar の実測値。
+ */
+final class Prefs {
+
+    static final String NAME = "kipfelnav";
+    static final String COVER = "cover";
+    static final String MAIN = "main";
+
+    static final String CENTER = "center";      // 真ん中のボタンの中心(幅に対する割合)
+    static final String SPACING = "spacing";    // ボタンの間隔(幅に対する割合)
+    static final String SIZE = "size";          // 絵の大きさ(ナビバーの高さに対する割合)
+    static final String OFFSET_Y = "offsetY";   // 上下のずらし(dp)
+
+    static final String GUIDES = "guides";              // 位置合わせ用の枠
+    static final String BACK_ON_RIGHT = "backOnRight";  // 並びが「履歴・ホーム・戻る」
+    static final String PIXEL_SNAP = "pixelSnap";       // 整数倍で拡大してドットをくっきり
+    static final String SHEET_VERSION = "sheetVersion";
+
+    private Prefs() {
+    }
+
+    static SharedPreferences of(Context c) {
+        return c.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+    }
+
+    static String key(String screen, String item) {
+        return screen + "." + item;
+    }
+
+    static float defaultValue(String screen, String item) {
+        boolean cover = COVER.equals(screen);
+        switch (item) {
+            case CENTER:
+                return cover ? 0.500f : 0.718f;
+            case SPACING:
+                return cover ? 0.279f : 0.132f;
+            case SIZE:
+                return 0.70f;
+            default:
+                return 0f;
+        }
+    }
+
+    static float get(SharedPreferences p, String screen, String item) {
+        return p.getFloat(key(screen, item), defaultValue(screen, item));
+    }
+
+    /** 短い辺が 600dp 以上なら開いた画面。 */
+    static String screenFor(int widthPx, int heightPx, float density) {
+        return Math.min(widthPx, heightPx) / density >= 600 ? MAIN : COVER;
+    }
+}
