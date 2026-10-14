@@ -169,6 +169,9 @@ class KipfelOverlayView extends View {
             if (!isShown && wasWindowOnly) {
                 // スワイプで出したバーは、一覧から消えた時点でもう沈みきっている
                 animateShown(false, QUICK_FADE_MS, false);
+            } else if (isShown && windowOnly) {
+                // スワイプで出したバーは、バーの位置(slide)を追いかけるので、独自の浮き上がりはしない
+                animateShown(true, QUICK_FADE_MS, false);
             } else {
                 animateShown(isShown, FADE_MS, true);
             }
