@@ -28,6 +28,7 @@ public class NavOverlayService extends AccessibilityService {
 
     // 画面の状態(ナビバー・キーボード・ロック)を見る間隔。コマ送りは絵の側で時間から決める
     private static final long POLL_MS = 50;
+    private static final long FAST_POLL_MS = 16;
     private static final int OVERLAY_HEIGHT_DP = 120;
     private static final int OVERLAY_HEIGHT_GUIDES_DP = 420; // ガイド表示中は確認用の文字を出すので高くする
 
@@ -42,7 +43,8 @@ public class NavOverlayService extends AccessibilityService {
         @Override
         public void run() {
             pollNow();
-            handler.postDelayed(this, POLL_MS);
+            // スワイプで出したバーが出ているあいだは、画面のコマごとに見る
+            handler.postDelayed(this, overlay != null && overlay.wantsFastPoll() ? FAST_POLL_MS : POLL_MS);
         }
     };
 

@@ -38,6 +38,8 @@ import java.util.Map;
 class KipfelOverlayView extends View {
 
     private static final long FADE_MS = 220;
+    // スワイプで出したバーが消えたとき。バーはもう沈みきっているので、すぐ消す
+    private static final long QUICK_FADE_MS = 70;
 
     private final WindowManager windowManager;
     private final KeyguardManager keyguardManager;
@@ -58,6 +60,16 @@ class KipfelOverlayView extends View {
     private boolean imeVisible;
     private boolean locked;
     private String screen = Prefs.COVER;
+    // ナビバーの本来の高さ(隠れていても分かる)と、沈んでいく途中のずれ
+    private int navFull;
+    private int slide;
+    private int slideFromWindow;
+    // ウィンドウ一覧でだけ見えている(=スワイプで一時的に出したバー)
+    private boolean windowOnly;
+    // 画面情報で「隠れた」になった後、沈みきるまでのウィンドウ一覧は無視する
+    private boolean ignoreWindowUntilGone;
+    private boolean metricsShownBefore;
+    private int navWindowTop = Integer.MAX_VALUE;
     // 確認用(ガイド表示中に出す)
     private int navFromMetrics;
     private int navFromWindows;
@@ -66,6 +78,7 @@ class KipfelOverlayView extends View {
 
     // 出てくる・消えるアニメーション(0 = 消えている、1 = 出ている)
     private float shown;
+    private boolean sinkOnFade = true;
     private ValueAnimator fade;
 
     KipfelOverlayView(Context context) {
@@ -84,7 +97,7 @@ class KipfelOverlayView extends View {
         reloadImages();
         measureScreen(Collections.emptyList());
         shown = navHeight > 0 ? 1f : 0f;
-        lastNavHeight = navHeight;
+        lastNavHeight = navFull;
     }
 
     // ---- 画像
@@ -139,15 +152,33 @@ class KipfelOverlayView extends View {
     /** 50ms ごとと、ウィンドウが変わったときに呼ばれる。画面の状態を測り直して描き直す。 */
     void poll(List<AccessibilityWindowInfo> windows) {
         boolean wasShown = navHeight > 0;
+        boolean wasWindowOnly = windowOnly;
         measureScreen(windows);
         boolean isShown = navHeight > 0;
         if (isShown) {
-            lastNavHeight = navHeight;
+            lastNavHeight = navFull;
+        }
+        // 沈めた分(slide)は、スワイプで出したバーを追いかけているときだけ更新する。
+        // 消えていく途中は最後の値のままにして、元の位置に跳ね戻らないようにする
+        if (windowOnly) {
+            slide = slideFromWindow;
+        } else if (isShown) {
+            slide = 0;
         }
         if (wasShown != isShown) {
-            animateShown(isShown);
+            if (!isShown && wasWindowOnly) {
+                // スワイプで出したバーは、一覧から消えた時点でもう沈みきっている
+                animateShown(false, QUICK_FADE_MS, false);
+            } else {
+                animateShown(isShown, FADE_MS, true);
+            }
         }
         invalidate();
+    }
+
+    /** スワイプで出したバーが出ているあいだは、沈み始めを追いかけるために細かく見る。 */
+    boolean wantsFastPoll() {
+        return windowOnly;
     }
 
     private void measureScreen(List<AccessibilityWindowInfo> windows) {
@@ -158,7 +189,25 @@ class KipfelOverlayView extends View {
         // 下にナビバーがあるときだけ描く。横にあるとき(left/right)は描かない
         navFromMetrics = nav.bottom;
         navFromWindows = findNavWindow(windows, b.width(), b.height());
-        navHeight = navFromWindows > 0 ? navFromWindows : navFromMetrics;
+        boolean metricsShown = navFromMetrics > 0;
+        boolean windowShown = navFromWindows > 0;
+        // アプリがバーを隠した(画面情報が「隠れた」に変わった)ときは、すぐ消し始める。
+        // そのあとバーが沈みきってウィンドウ一覧から消えるまでは、一覧の方は見ない
+        if (metricsShownBefore && !metricsShown && windowShown) {
+            ignoreWindowUntilGone = true;
+        }
+        if (!windowShown) {
+            ignoreWindowUntilGone = false;
+        }
+        metricsShownBefore = metricsShown;
+        windowOnly = !metricsShown && windowShown && !ignoreWindowUntilGone;
+        navHeight = metricsShown ? navFromMetrics : windowOnly ? navFromWindows : 0;
+        // 隠れていても本来の高さは取れる。沈んでいく途中でウィンドウが縮んでも、絵の大きさは変えない
+        int ignoring = in.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars()).bottom;
+        navFull = Math.max(ignoring, Math.max(navFromMetrics, navFromWindows));
+        // ウィンドウ一覧の位置が沈んでいく途中を反映しているなら、その分だけ一緒に沈める
+        slideFromWindow = windowShown && navFull > 0
+                ? Math.max(0, Math.min(navFull, navWindowTop - (b.height() - navFull))) : 0;
         imeVisible = in.isVisible(WindowInsets.Type.ime());
         locked = keyguardManager.isKeyguardLocked();
         screen = Prefs.screenFor(b.width(), b.height(), dp);
@@ -174,23 +223,28 @@ class KipfelOverlayView extends View {
             windowLines.clear();
         }
         int found = 0;
+        // 見つけ始めは 24dp 以上。追いかけている最中は、沈んで縮んでいく途中も拾う
+        float minH = navFromWindows > 0 ? 1 : 24 * dp;
+        int top = Integer.MAX_VALUE;
         for (AccessibilityWindowInfo w : windows) {
             w.getBoundsInScreen(wb);
             CharSequence title = w.getTitle();
             String t = title == null ? "" : title.toString();
             boolean atBottom = wb.bottom >= screenH - 2 && wb.width() >= screenW / 2
-                    && wb.height() >= 24 * dp && wb.height() <= 120 * dp;
+                    && wb.height() >= minH && wb.height() <= 120 * dp;
             boolean named = t.contains("avigation") || t.contains("ナビゲーション");
             boolean isNav = w.getType() == AccessibilityWindowInfo.TYPE_SYSTEM && atBottom
                     || named && atBottom;
             if (isNav) {
                 found = Math.max(found, wb.height());
+                top = Math.min(top, wb.top);
             }
             if (guides && windowLines.size() < 12) {
                 windowLines.add((isNav ? "★" : "・") + typeName(w.getType()) + " " + wb.toShortString()
                         + (t.isEmpty() ? "" : " 「" + t + "」"));
             }
         }
+        navWindowTop = top;
         return found;
     }
 
@@ -211,13 +265,14 @@ class KipfelOverlayView extends View {
         }
     }
 
-    private void animateShown(boolean show) {
+    private void animateShown(boolean show, long durationMs, boolean sink) {
         if (fade != null) {
             fade.cancel();
         }
+        sinkOnFade = sink;
         float target = show ? 1f : 0f;
         fade = ValueAnimator.ofFloat(shown, target);
-        fade.setDuration((long) (FADE_MS * Math.abs(target - shown)));
+        fade.setDuration((long) (durationMs * Math.abs(target - shown)));
         fade.setInterpolator(show ? new DecelerateInterpolator() : new AccelerateInterpolator());
         fade.addUpdateListener(a -> {
             shown = (float) a.getAnimatedValue();
@@ -244,10 +299,10 @@ class KipfelOverlayView extends View {
         boolean backOnRight = prefs.getBoolean(Prefs.BACK_ON_RIGHT, false);
         boolean snap = prefs.getBoolean(Prefs.PIXEL_SNAP, true);
 
-        // 消えるときは下に沈む
+        // 消えるときは下に沈む。スワイプで出したバーは、バー自体の沈み具合(slide)に合わせる
         int alpha = Math.round(255 * shown);
         c.save();
-        c.translate(0, (1f - shown) * navH);
+        c.translate(0, (sinkOnFade ? (1f - shown) * navH : 0) + slide);
 
         if (guides) {
             guideStrip.setAlpha(Math.round(70 * shown));
@@ -295,7 +350,8 @@ class KipfelOverlayView extends View {
         List<String> lines = new ArrayList<>();
         lines.add((Prefs.MAIN.equals(screen) ? "開いた画面" : "閉じた画面")
                 + "  キーボード " + (imeVisible ? "あり" : "なし") + (locked ? "  ロック中" : ""));
-        lines.add("ナビバー:画面情報 " + navFromMetrics + "px / ウィンドウ一覧 " + navFromWindows + "px");
+        lines.add("ナビバー:画面情報 " + navFromMetrics + "px / ウィンドウ一覧 " + navFromWindows + "px"
+                + " / 本来 " + navFull + "px / 沈み " + slide + "px" + (windowOnly ? " (スワイプ)" : ""));
         lines.addAll(windowLines);
         float lineH = text.getTextSize() * 1.3f;
         float maxW = 0;
