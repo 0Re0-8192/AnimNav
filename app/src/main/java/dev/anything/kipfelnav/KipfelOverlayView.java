@@ -15,15 +15,22 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.view.animation.AccelerateInterpolator;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.animation.DecelerateInterpolator;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * ナビバーの3つのボタンの真上に、ボタンごとの絵を描く。
  * このビューは画面の下端に置かれる(高さはナビバーより少し大きいくらい)。タップは素通り。
  * - 下にナビバーがないとき(ロック画面・全画面・ナビバーが横にあるとき)は描かない。
+ *   ナビバーが出ているかは、アプリ向けの画面情報(WindowMetrics)と、アクセシビリティの
+ *   ウィンドウ一覧の両方で見る。スワイプで一時的に出したナビバーは前者では「隠れている」扱いに
+ *   なるので、後者で拾う。
  *   消えるとき・出てくるときは、純正のナビバーのように下へ沈みながらフェードする。
  * - ロック中(パスワード入力画面など)は、戻るだけを描く。
  * - キーボード表示中は、戻るの位置に「キーボードを閉じる」の絵を描く。
@@ -51,6 +58,11 @@ class KipfelOverlayView extends View {
     private boolean imeVisible;
     private boolean locked;
     private String screen = Prefs.COVER;
+    // 確認用(ガイド表示中に出す)
+    private int navFromMetrics;
+    private int navFromWindows;
+    private final List<String> windowLines = new ArrayList<>();
+    private final Rect wb = new Rect();
 
     // 出てくる・消えるアニメーション(0 = 消えている、1 = 出ている)
     private float shown;
@@ -70,7 +82,7 @@ class KipfelOverlayView extends View {
         text.setTextSize(12 * dp);
         panel.setColor(Color.argb(170, 0, 0, 0));
         reloadImages();
-        measureScreen();
+        measureScreen(Collections.emptyList());
         shown = navHeight > 0 ? 1f : 0f;
         lastNavHeight = navHeight;
     }
@@ -124,10 +136,10 @@ class KipfelOverlayView extends View {
 
     // ---- 画面の状態
 
-    /** 50ms ごとに呼ばれる。画面の状態を測り直して描き直す。 */
-    void poll() {
+    /** 50ms ごとと、ウィンドウが変わったときに呼ばれる。画面の状態を測り直して描き直す。 */
+    void poll(List<AccessibilityWindowInfo> windows) {
         boolean wasShown = navHeight > 0;
-        measureScreen();
+        measureScreen(windows);
         boolean isShown = navHeight > 0;
         if (isShown) {
             lastNavHeight = navHeight;
@@ -138,16 +150,65 @@ class KipfelOverlayView extends View {
         invalidate();
     }
 
-    private void measureScreen() {
+    private void measureScreen(List<AccessibilityWindowInfo> windows) {
         WindowMetrics m = windowManager.getCurrentWindowMetrics();
         Rect b = m.getBounds();
         WindowInsets in = m.getWindowInsets();
         Insets nav = in.getInsets(WindowInsets.Type.navigationBars());
         // 下にナビバーがあるときだけ描く。横にあるとき(left/right)は描かない
-        navHeight = nav.bottom;
+        navFromMetrics = nav.bottom;
+        navFromWindows = findNavWindow(windows, b.width(), b.height());
+        navHeight = navFromWindows > 0 ? navFromWindows : navFromMetrics;
         imeVisible = in.isVisible(WindowInsets.Type.ime());
         locked = keyguardManager.isKeyguardLocked();
         screen = Prefs.screenFor(b.width(), b.height(), dp);
+    }
+
+    /**
+     * ウィンドウ一覧から、画面の下端にある横長のシステムのウィンドウ(=ナビバー)を探して高さを返す。
+     * 見つからなければ 0。中身は見ない(種類・位置・タイトルだけ)。
+     */
+    private int findNavWindow(List<AccessibilityWindowInfo> windows, int screenW, int screenH) {
+        boolean guides = prefs.getBoolean(Prefs.GUIDES, false);
+        if (guides) {
+            windowLines.clear();
+        }
+        int found = 0;
+        for (AccessibilityWindowInfo w : windows) {
+            w.getBoundsInScreen(wb);
+            CharSequence title = w.getTitle();
+            String t = title == null ? "" : title.toString();
+            boolean atBottom = wb.bottom >= screenH - 2 && wb.width() >= screenW / 2
+                    && wb.height() >= 24 * dp && wb.height() <= 120 * dp;
+            boolean named = t.contains("avigation") || t.contains("ナビゲーション");
+            boolean isNav = w.getType() == AccessibilityWindowInfo.TYPE_SYSTEM && atBottom
+                    || named && atBottom;
+            if (isNav) {
+                found = Math.max(found, wb.height());
+            }
+            if (guides && windowLines.size() < 12) {
+                windowLines.add((isNav ? "★" : "・") + typeName(w.getType()) + " " + wb.toShortString()
+                        + (t.isEmpty() ? "" : " 「" + t + "」"));
+            }
+        }
+        return found;
+    }
+
+    private static String typeName(int type) {
+        switch (type) {
+            case AccessibilityWindowInfo.TYPE_APPLICATION:
+                return "アプリ";
+            case AccessibilityWindowInfo.TYPE_INPUT_METHOD:
+                return "キーボード";
+            case AccessibilityWindowInfo.TYPE_SYSTEM:
+                return "システム";
+            case AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY:
+                return "重ね描き";
+            case AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER:
+                return "分割線";
+            default:
+                return "種類" + type;
+        }
     }
 
     private void animateShown(boolean show) {
@@ -223,16 +284,29 @@ class KipfelOverlayView extends View {
             }
         }
 
-        if (guides) {
-            String s = (Prefs.MAIN.equals(screen) ? "開いた画面" : "閉じた画面")
-                    + "  ナビバー " + navH + "px  キーボード " + (imeVisible ? "あり" : "なし")
-                    + (locked ? "  ロック中" : "");
-            float tw = text.measureText(s);
-            float ty = h - navH - 16 * dp;
-            c.drawRect(8 * dp, ty - text.getTextSize() - 4 * dp, 16 * dp + tw, ty + 6 * dp, panel);
-            c.drawText(s, 12 * dp, ty, text);
-        }
         c.restore();
+        if (guides) {
+            drawDebug(c, h - navH - 12 * dp);
+        }
+    }
+
+    /** ガイド表示中の確認用の文字。下から上へ積む。 */
+    private void drawDebug(Canvas c, float bottom) {
+        List<String> lines = new ArrayList<>();
+        lines.add((Prefs.MAIN.equals(screen) ? "開いた画面" : "閉じた画面")
+                + "  キーボード " + (imeVisible ? "あり" : "なし") + (locked ? "  ロック中" : ""));
+        lines.add("ナビバー:画面情報 " + navFromMetrics + "px / ウィンドウ一覧 " + navFromWindows + "px");
+        lines.addAll(windowLines);
+        float lineH = text.getTextSize() * 1.3f;
+        float maxW = 0;
+        for (String s : lines) {
+            maxW = Math.max(maxW, text.measureText(s));
+        }
+        float top = bottom - lineH * lines.size();
+        c.drawRect(8 * dp, top - 4 * dp, 16 * dp + maxW, bottom + 6 * dp, panel);
+        for (int i = 0; i < lines.size(); i++) {
+            c.drawText(lines.get(i), 12 * dp, top + lineH * (i + 1) - 4 * dp, text);
+        }
     }
 
     /**

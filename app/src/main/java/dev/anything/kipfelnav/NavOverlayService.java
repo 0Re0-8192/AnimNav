@@ -14,6 +14,10 @@ import android.os.PowerManager;
 import android.view.Gravity;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityWindowInfo;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 画面全体に、タップを素通りさせる透明な層を1枚重ねて、ナビバーの上にキプフェルを描く。
@@ -25,19 +29,19 @@ public class NavOverlayService extends AccessibilityService {
     // 画面の状態(ナビバー・キーボード・ロック)を見る間隔。コマ送りは絵の側で時間から決める
     private static final long POLL_MS = 50;
     private static final int OVERLAY_HEIGHT_DP = 120;
+    private static final int OVERLAY_HEIGHT_GUIDES_DP = 420; // ガイド表示中は確認用の文字を出すので高くする
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private WindowManager windowManager;
     private KipfelOverlayView overlay;
+    private WindowManager.LayoutParams lp;
     private SharedPreferences prefs;
     private boolean ticking;
 
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
-            if (overlay != null) {
-                overlay.poll();
-            }
+            pollNow();
             handler.postDelayed(this, POLL_MS);
         }
     };
@@ -49,6 +53,9 @@ public class NavOverlayService extends AccessibilityService {
         }
         if (Prefs.IMAGES_VERSION.equals(key) || Prefs.FRAME_MS.equals(key)) {
             overlay.reloadImages();
+        }
+        if (Prefs.GUIDES.equals(key)) {
+            applyHeight();
         }
         overlay.invalidate();
     };
@@ -70,11 +77,11 @@ public class NavOverlayService extends AccessibilityService {
         windowManager = getSystemService(WindowManager.class);
         overlay = new KipfelOverlayView(this);
 
+        prefs = Prefs.of(this);
         // 描くのはナビバーのあたりだけなので、画面の下端だけを覆う
-        int height = (int) (OVERLAY_HEIGHT_DP * getResources().getDisplayMetrics().density);
-        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+        lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
-                height,
+                overlayHeight(),
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                         | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
@@ -88,7 +95,6 @@ public class NavOverlayService extends AccessibilityService {
         lp.setTitle("KipfelNavOverlay");
         windowManager.addView(overlay, lp);
 
-        prefs = Prefs.of(this);
         prefs.registerOnSharedPreferenceChangeListener(prefsListener);
 
         IntentFilter f = new IntentFilter();
@@ -98,6 +104,34 @@ public class NavOverlayService extends AccessibilityService {
 
         if (getSystemService(PowerManager.class).isInteractive()) {
             startTicking();
+        }
+    }
+
+    private int overlayHeight() {
+        int dp = prefs.getBoolean(Prefs.GUIDES, false) ? OVERLAY_HEIGHT_GUIDES_DP : OVERLAY_HEIGHT_DP;
+        return (int) (dp * getResources().getDisplayMetrics().density);
+    }
+
+    private void applyHeight() {
+        if (overlay != null && lp != null) {
+            lp.height = overlayHeight();
+            windowManager.updateViewLayout(overlay, lp);
+        }
+    }
+
+    private void pollNow() {
+        if (overlay != null) {
+            overlay.poll(windows());
+        }
+    }
+
+    /** 画面に出ているウィンドウの一覧(種類と位置を見るだけ)。取れなければ空。 */
+    private List<AccessibilityWindowInfo> windows() {
+        try {
+            List<AccessibilityWindowInfo> w = getWindows();
+            return w != null ? w : Collections.emptyList();
+        } catch (RuntimeException e) {
+            return Collections.emptyList();
         }
     }
 
@@ -123,16 +157,16 @@ public class NavOverlayService extends AccessibilityService {
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         // Fold の開閉・回転:すぐ測り直す
-        if (overlay != null) {
-            overlay.poll();
-        }
+        pollNow();
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // 画面の内容は使わない。画面が切り替わったら、次のコマを待たずに測り直すだけ
-        if (overlay != null && event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            overlay.poll();
+        // 中身は使わない。ウィンドウが出入りしたら、次の周期を待たずに測り直すだけ
+        int type = event.getEventType();
+        if (type == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                || type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            pollNow();
         }
     }
 

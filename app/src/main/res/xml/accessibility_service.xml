@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 画面の内容は読まない(canRetrieveWindowContent="false")。受け取るイベントも最小限 -->
+<!--
+  ウィンドウの一覧(種類と位置)を見るために canRetrieveWindowContent と
+  flagRetrieveInteractiveWindows を使う。スワイプで一時的に出したナビバーは、
+  アプリ向けの情報では「隠れている」扱いになるため、ウィンドウの一覧で直接確かめる。
+  ウィンドウの中身(文字やボタン)は読まない。
+-->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault"
-    android:canRetrieveWindowContent="false"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
     android:description="@string/service_description"
-    android:notificationTimeout="1000" />
+    android:notificationTimeout="0" />
