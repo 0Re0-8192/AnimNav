@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
 
     private SharedPreferences prefs;
     private String screen;
+    private boolean sideways;
     private LinearLayout root;
     private TextView status;
     private final EnumMap<Slot, TextView> slotStatus = new EnumMap<>(Slot.class);
@@ -41,7 +42,12 @@ public class MainActivity extends Activity {
         prefs = Prefs.of(this);
         pad = (int) (16 * getResources().getDisplayMetrics().density);
         Rect b = getWindowManager().getCurrentWindowMetrics().getBounds();
-        screen = Prefs.screenFor(b.width(), b.height(), getResources().getDisplayMetrics().density);
+        // ナビバーが横にある(カバー画面の横向き)ときは、その配置用の設定を合わせる
+        android.graphics.Insets nav = getWindowManager().getCurrentWindowMetrics().getWindowInsets()
+                .getInsetsIgnoringVisibility(android.view.WindowInsets.Type.navigationBars());
+        sideways = nav.bottom == 0 && (nav.left > 0 || nav.right > 0);
+        screen = Prefs.screenKey(
+                Prefs.screenFor(b.width(), b.height(), getResources().getDisplayMetrics().density), sideways);
 
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -88,15 +94,19 @@ public class MainActivity extends Activity {
         }
         intSlider("PNG 連番・PNG の1コマの長さ", Prefs.FRAME_MS, Prefs.DEFAULT_FRAME_MS, 30, 600, v -> v + "ms");
 
-        heading("3. 位置合わせ(" + (Prefs.MAIN.equals(screen) ? "開いた画面" : "閉じた画面") + ")", 18);
-        text("閉じた画面と開いた画面で別々に保存されます。もう一方は、その画面でこのアプリを開いて合わせてください。", 15);
+        heading("3. 位置合わせ(" + (screen.startsWith(Prefs.MAIN) ? "開いた画面" : "閉じた画面")
+                + (sideways ? "・ナビバーが横" : "") + ")", 18);
+        text("閉じた画面・開いた画面・ナビバーが横のとき(カバー画面の横向き)で別々に保存されます。"
+                + "ほかの場合は、その状態でこのアプリを開いて合わせてください。", 15);
         check("位置合わせ用の枠を表示", Prefs.GUIDES, false);
         check("ボタンの並びが「履歴・ホーム・戻る」", Prefs.BACK_ON_RIGHT, false);
         check("ドットをくっきり(整数倍で拡大)", Prefs.PIXEL_SNAP, true);
-        slider("横位置(真ん中のボタン)", Prefs.CENTER, 0f, 1f, 1000, v -> pct(v));
+        slider(sideways ? "縦位置(真ん中のボタン)" : "横位置(真ん中のボタン)", Prefs.CENTER, 0f, 1f, 1000, v -> pct(v));
         slider("ボタンの間隔", Prefs.SPACING, 0f, 0.4f, 400, v -> pct(v));
-        slider("大きさ(ナビバーの高さに対して)", Prefs.SIZE, 0.3f, 1.5f, 120, v -> pct(v));
-        slider("上下", Prefs.OFFSET_Y, -30f, 30f, 60, v -> String.format(Locale.ROOT, "%+.0fdp", v));
+        slider(sideways ? "大きさ(ナビバーの幅に対して)" : "大きさ(ナビバーの高さに対して)",
+                Prefs.SIZE, 0.3f, 1.5f, 120, v -> pct(v));
+        slider(sideways ? "内側・外側(+で画面の内側へ)" : "上下(+で下へ)",
+                Prefs.OFFSET_Y, -30f, 30f, 60, v -> String.format(Locale.ROOT, "%+.0fdp", v));
         button("この画面の位置を初期値に戻す", () -> {
             prefs.edit()
                     .remove(Prefs.key(screen, Prefs.CENTER))

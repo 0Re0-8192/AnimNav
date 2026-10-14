@@ -38,13 +38,25 @@ final class Prefs {
         return screen + "." + item;
     }
 
+    /**
+     * 設定の保存先。ナビバーが横(カバー画面の横向き)のときは別に持つ。
+     * そのときの位置は、画面の高さに対する割合。
+     */
+    static String screenKey(String screen, boolean sideways) {
+        return sideways ? screen + SIDE_SUFFIX : screen;
+    }
+
+    static final String SIDE_SUFFIX = "Side";
+
     static float defaultValue(String screen, String item) {
-        boolean cover = COVER.equals(screen);
+        boolean cover = screen.startsWith(COVER);
+        boolean sideways = screen.endsWith(SIDE_SUFFIX);
         switch (item) {
             case CENTER:
-                return cover ? 0.500f : 0.718f;
+                return cover || sideways ? 0.500f : 0.718f;
             case SPACING:
-                return cover ? 0.279f : 0.132f;
+                // カバー画面の横向きは実測で約 305px / 1080px
+                return sideways ? 0.282f : cover ? 0.279f : 0.132f;
             case SIZE:
                 return 0.70f;
             default:

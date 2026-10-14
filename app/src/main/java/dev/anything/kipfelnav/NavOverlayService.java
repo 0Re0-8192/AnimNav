@@ -29,10 +29,9 @@ public class NavOverlayService extends AccessibilityService {
 
     // 画面の状態(ナビバー・キーボード・ロック)を見る間隔。コマ送りは絵の側で時間から決める
     private static final long POLL_MS = 50;
-    private static final long WAITING_POLL_MS = 33;  // 全画面でバーが隠れているあいだ
     private static final long TRACKING_POLL_MS = 16; // スワイプで出したバーが出ているあいだ
-    private static final int OVERLAY_HEIGHT_DP = 120;
-    private static final int OVERLAY_HEIGHT_GUIDES_DP = 420; // ガイド表示中は確認用の文字を出すので高くする
+    // 重ね描きの窓はナビバーのある辺に沿った帯にする(ガイド表示中は確認用の文字を出すので画面全体)
+    private static final int OVERLAY_THICK_DP = 120;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private WindowManager windowManager;
@@ -40,6 +39,8 @@ public class NavOverlayService extends AccessibilityService {
     private WindowManager.LayoutParams lp;
     private SharedPreferences prefs;
     private boolean ticking;
+    private KipfelOverlayView.Side appliedSide;
+    private boolean appliedGuides;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -58,7 +59,7 @@ public class NavOverlayService extends AccessibilityService {
             overlay.reloadImages();
         }
         if (Prefs.GUIDES.equals(key)) {
-            applyHeight();
+            applyLayout();
         }
         overlay.invalidate();
     };
@@ -81,10 +82,9 @@ public class NavOverlayService extends AccessibilityService {
         overlay = new KipfelOverlayView(this);
 
         prefs = Prefs.of(this);
-        // 描くのはナビバーのあたりだけなので、画面の下端だけを覆う
         lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
-                overlayHeight(),
+                WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                         | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
@@ -92,10 +92,10 @@ public class NavOverlayService extends AccessibilityService {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
-        lp.gravity = Gravity.BOTTOM | Gravity.START;
         lp.setFitInsetsTypes(0);
         lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
         lp.setTitle("KipfelNavOverlay");
+        setLayout();
         windowManager.addView(overlay, lp);
 
         prefs.registerOnSharedPreferenceChangeListener(prefsListener);
@@ -110,39 +110,62 @@ public class NavOverlayService extends AccessibilityService {
         }
     }
 
-    private int overlayHeight() {
-        int dp = prefs.getBoolean(Prefs.GUIDES, false) ? OVERLAY_HEIGHT_GUIDES_DP : OVERLAY_HEIGHT_DP;
-        return (int) (dp * getResources().getDisplayMetrics().density);
+    /** 窓をナビバーのある辺に沿った帯にする。ガイド表示中は画面全体。 */
+    private void setLayout() {
+        appliedSide = overlay.side();
+        appliedGuides = prefs.getBoolean(Prefs.GUIDES, false);
+        int thick = (int) (OVERLAY_THICK_DP * getResources().getDisplayMetrics().density);
+        int match = WindowManager.LayoutParams.MATCH_PARENT;
+        if (appliedGuides) {
+            lp.width = match;
+            lp.height = match;
+            lp.gravity = Gravity.TOP | Gravity.START;
+            return;
+        }
+        switch (appliedSide) {
+            case RIGHT:
+                lp.width = thick;
+                lp.height = match;
+                lp.gravity = Gravity.TOP | Gravity.END;
+                break;
+            case LEFT:
+                lp.width = thick;
+                lp.height = match;
+                lp.gravity = Gravity.TOP | Gravity.START;
+                break;
+            default:
+                lp.width = match;
+                lp.height = thick;
+                lp.gravity = Gravity.BOTTOM | Gravity.START;
+                break;
+        }
     }
 
-    private void applyHeight() {
+    private void applyLayout() {
         if (overlay != null && lp != null) {
-            lp.height = overlayHeight();
+            setLayout();
             windowManager.updateViewLayout(overlay, lp);
         }
     }
 
     private long nextPollMs() {
-        if (overlay == null) {
-            return POLL_MS;
-        }
-        if (overlay.trackingSwipeBar()) {
-            return TRACKING_POLL_MS;
-        }
-        return overlay.waitingForSwipeBar() ? WAITING_POLL_MS : POLL_MS;
+        return overlay != null && overlay.trackingSwipeBar() ? TRACKING_POLL_MS : POLL_MS;
     }
 
     private void pollNow() {
         if (overlay == null) {
             return;
         }
-        // ウィンドウ一覧の変化は、Android からまとめて少し遅れて届き、それまでは手元の古い一覧が返る。
-        // スワイプで出るバーをすぐ拾うため、全画面のあいだは手元の一覧を捨てて最新を取りに行く
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && (overlay.trackingSwipeBar() || overlay.waitingForSwipeBar())) {
+        // スワイプで出したバーが出ているあいだは、手元に保存された一覧を捨てて最新を取りに行き、
+        // バーが沈み始めたらすぐ追いかける
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && overlay.trackingSwipeBar()) {
             clearCache();
         }
         overlay.poll(windows());
+        // ナビバーの辺が変わったら(カバー画面を横にしたときなど)、窓の置き場所も合わせる
+        if (overlay.side() != appliedSide) {
+            applyLayout();
+        }
     }
 
     /** 画面に出ているウィンドウの一覧(種類と位置を見るだけ)。取れなければ空。 */
