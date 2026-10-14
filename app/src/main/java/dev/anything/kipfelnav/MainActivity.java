@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
@@ -21,22 +19,20 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.util.EnumMap;
 import java.util.Locale;
 
 /** 権限設定への近道、画像の取り込み、位置合わせ。 */
 public class MainActivity extends Activity {
 
-    private static final int PICK_SHEET = 1;
+    private static final int PICK_BASE = 100; // + Slot.ordinal()
 
     private SharedPreferences prefs;
     private String screen;
     private LinearLayout root;
     private TextView status;
-    private TextView sheetStatus;
+    private final EnumMap<Slot, TextView> slotStatus = new EnumMap<>(Slot.class);
     private int pad;
 
     @Override
@@ -64,14 +60,33 @@ public class MainActivity extends Activity {
                 () -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
 
         heading("2. 画像", 18);
-        text("4行(戻る・ホーム・履歴・キーボードを閉じる)× コマ数の PNG を取り込みます。", 15);
-        sheetStatus = text("", 15);
-        button("画像を取り込む", () -> {
-            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            i.addCategory(Intent.CATEGORY_OPENABLE);
-            i.setType("image/png");
-            startActivityForResult(i, PICK_SHEET);
-        });
+        text("ボタンごとに取り込みます。GIF・WebP(アニメも可)、PNG 1枚、PNG 連番を固めた ZIP に対応。"
+                + "キーボードを閉じるを設定しないと、キーボード表示中も戻るの絵のままです。", 15);
+        for (Slot slot : Slot.values()) {
+            slotStatus.put(slot, text("", 15));
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            Button pick = new Button(this);
+            pick.setText(slot.label + "を選ぶ");
+            pick.setOnClickListener(v -> {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("*/*");
+                i.putExtra(Intent.EXTRA_MIME_TYPES,
+                        new String[]{"image/gif", "image/webp", "image/png", "application/zip"});
+                startActivityForResult(i, PICK_BASE + slot.ordinal());
+            });
+            Button clear = new Button(this);
+            clear.setText("外す");
+            clear.setOnClickListener(v -> {
+                ImageStore.clear(this, slot);
+                imagesChanged();
+            });
+            row.addView(pick, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 3));
+            row.addView(clear, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            root.addView(row);
+        }
+        intSlider("PNG 連番・PNG の1コマの長さ", Prefs.FRAME_MS, Prefs.DEFAULT_FRAME_MS, 30, 600, v -> v + "ms");
 
         heading("3. 位置合わせ(" + (Prefs.MAIN.equals(screen) ? "開いた画面" : "閉じた画面") + ")", 18);
         text("閉じた画面と開いた画面で別々に保存されます。もう一方は、その画面でこのアプリを開いて合わせてください。", 15);
@@ -107,47 +122,42 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         status.setText(isServiceEnabled() ? "重ね描き:オン" : "重ね描き:オフ(1. の手順でオンにしてください)");
-        SpriteSheet s = SpriteSheet.load(this);
-        sheetStatus.setText(s == null ? "画像:まだ取り込んでいません" : "画像:取り込み済み(" + s.frames + "コマ)");
+        refreshSlotStatus();
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != PICK_SHEET || resultCode != RESULT_OK || data == null || data.getData() == null) {
+        int idx = requestCode - PICK_BASE;
+        if (idx < 0 || idx >= Slot.values().length || resultCode != RESULT_OK
+                || data == null || data.getData() == null) {
             return;
         }
+        Slot slot = Slot.values()[idx];
         try {
-            byte[] bytes = readAll(data.getData());
-            BitmapFactory.Options o = new BitmapFactory.Options();
-            o.inScaled = false;
-            Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);
-            if (!SpriteSheet.isValid(b)) {
-                Toast.makeText(this, "形が合いません(4行 × 正方形のコマの PNG が必要です)", Toast.LENGTH_LONG).show();
-                return;
-            }
-            try (FileOutputStream out = new FileOutputStream(SpriteSheet.file(this))) {
-                out.write(bytes);
-            }
-            prefs.edit().putLong(Prefs.SHEET_VERSION, System.currentTimeMillis()).apply();
-            Toast.makeText(this, "取り込みました", Toast.LENGTH_SHORT).show();
+            ImageStore.importInto(this, slot, data.getData());
+            imagesChanged();
+            Toast.makeText(this, slot.label + "を取り込みました", Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
-            Toast.makeText(this, "読み込めませんでした:" + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "取り込めませんでした:" + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
-    private byte[] readAll(Uri uri) throws IOException {
-        try (InputStream in = getContentResolver().openInputStream(uri);
-             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            if (in == null) {
-                throw new IOException("開けません");
+    private void imagesChanged() {
+        prefs.edit().putLong(Prefs.IMAGES_VERSION, System.currentTimeMillis()).apply();
+        refreshSlotStatus();
+    }
+
+    private void refreshSlotStatus() {
+        for (Slot slot : Slot.values()) {
+            SlotImage img = ImageStore.load(this, slot);
+            String d;
+            if (img == null) {
+                d = slot == Slot.HIDE_KEYBOARD ? "未設定(戻るの絵を使います)" : "未設定";
+            } else {
+                d = img.describe() + "(" + img.intrinsicSize() + "px)";
             }
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                out.write(buf, 0, n);
-            }
-            return out.toByteArray();
+            slotStatus.get(slot).setText(slot.label + ":" + d);
         }
     }
 
@@ -212,6 +222,36 @@ public class MainActivity extends Activity {
 
             @Override
             public void onStopTrackingTouch(SeekBar s) {
+            }
+        });
+        root.addView(bar);
+    }
+
+    private interface IntFmt {
+        String of(int v);
+    }
+
+    private void intSlider(String label, String key, int def, int min, int max, IntFmt fmt) {
+        TextView t = text("", 15);
+        SeekBar bar = new SeekBar(this);
+        bar.setMax(max - min);
+        int v = prefs.getInt(key, def);
+        bar.setProgress(v - min);
+        t.setText(label + ":" + fmt.of(v));
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
+                t.setText(label + ":" + fmt.of(min + p));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar s) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar s) {
+                // 指を離したときだけ保存(コマの長さを変えると画像を読み直すため)
+                prefs.edit().putInt(key, min + s.getProgress()).apply();
             }
         });
         root.addView(bar);

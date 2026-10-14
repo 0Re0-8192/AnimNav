@@ -22,7 +22,8 @@ import android.view.accessibility.AccessibilityEvent;
  */
 public class NavOverlayService extends AccessibilityService {
 
-    private static final long FRAME_MS = 150; // 元のカーソルと同じ速さ(9/60 秒)
+    // 画面の状態(ナビバー・キーボード・ロック)を見る間隔。コマ送りは絵の側で時間から決める
+    private static final long POLL_MS = 50;
     private static final int OVERLAY_HEIGHT_DP = 120;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -35,9 +36,9 @@ public class NavOverlayService extends AccessibilityService {
         @Override
         public void run() {
             if (overlay != null) {
-                overlay.tick();
+                overlay.poll();
             }
-            handler.postDelayed(this, FRAME_MS);
+            handler.postDelayed(this, POLL_MS);
         }
     };
 
@@ -46,8 +47,8 @@ public class NavOverlayService extends AccessibilityService {
         if (overlay == null) {
             return;
         }
-        if (Prefs.SHEET_VERSION.equals(key)) {
-            overlay.reloadSheet();
+        if (Prefs.IMAGES_VERSION.equals(key) || Prefs.FRAME_MS.equals(key)) {
+            overlay.reloadImages();
         }
         overlay.invalidate();
     };
@@ -77,6 +78,7 @@ public class NavOverlayService extends AccessibilityService {
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                         | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
@@ -103,12 +105,18 @@ public class NavOverlayService extends AccessibilityService {
         if (!ticking) {
             ticking = true;
             handler.post(tick);
+            if (overlay != null) {
+                overlay.setRunning(true);
+            }
         }
     }
 
     private void stopTicking() {
         ticking = false;
         handler.removeCallbacks(tick);
+        if (overlay != null) {
+            overlay.setRunning(false);
+        }
     }
 
     @Override
@@ -116,7 +124,7 @@ public class NavOverlayService extends AccessibilityService {
         super.onConfigurationChanged(newConfig);
         // Fold の開閉・回転:すぐ測り直す
         if (overlay != null) {
-            overlay.refresh();
+            overlay.poll();
         }
     }
 
@@ -124,7 +132,7 @@ public class NavOverlayService extends AccessibilityService {
     public void onAccessibilityEvent(AccessibilityEvent event) {
         // 画面の内容は使わない。画面が切り替わったら、次のコマを待たずに測り直すだけ
         if (overlay != null && event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            overlay.refresh();
+            overlay.poll();
         }
     }
 

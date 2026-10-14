@@ -21,8 +21,11 @@ final class Prefs {
 
     static final String GUIDES = "guides";              // 位置合わせ用の枠
     static final String BACK_ON_RIGHT = "backOnRight";  // 並びが「履歴・ホーム・戻る」
-    static final String PIXEL_SNAP = "pixelSnap";       // 整数倍で拡大してドットをくっきり
-    static final String SHEET_VERSION = "sheetVersion";
+    static final String PIXEL_SNAP = "pixelSnap";       // 整数倍・整数分の1でドットをくっきり
+    static final String FRAME_MS = "frameMs";           // PNG 連番の1コマの長さ
+    static final String IMAGES_VERSION = "imagesVersion";
+
+    static final int DEFAULT_FRAME_MS = 150;
 
     private Prefs() {
     }
