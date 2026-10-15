@@ -184,9 +184,11 @@ class KipfelOverlayView extends View {
                 // スワイプで出したバーは、一覧から消えた時点でもう沈みきっている
                 animateShown(false, QUICK_FADE_MS, false);
             } else if (shownNow && windowOnly) {
-                // スワイプで出したバーは、バーの位置(slide)を追いかけるので、独自の浮き上がりはしない
+                // スワイプで出したバーは、気づいた時点でもうバーが上がりきっていることが多い。
+                // 急に出て見えないように、ふつうの出方(下から浮き上がりながらフェード)にする。
+                // バーが途中なら、その位置(slide)ぶんが上に足されるだけで、同じ最終位置に着く
                 lateShows++;
-                animateShown(true, QUICK_FADE_MS, false);
+                animateShown(true, FADE_MS, true);
             } else {
                 animateShown(shownNow, FADE_MS, true);
             }

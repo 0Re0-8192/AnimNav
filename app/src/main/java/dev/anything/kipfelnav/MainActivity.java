@@ -117,13 +117,14 @@ public class MainActivity extends Activity {
             recreate();
         });
 
-        heading("4. スワイプの先読み", 18);
-        text("全画面のアプリでナビバーをスワイプで出すと、Android の都合でキプフェルが遅れて出ます。"
+        heading("4. スワイプの先読み(実験)", 18);
+        text("音ゲーなど、画面の端からのタッチを使うアプリでは使わないでください。"
+                + "全画面のアプリでナビバーをスワイプで出すと、Android の都合でキプフェルが遅れて出ます。"
                 + "これをオンにすると、全画面のあいだだけ画面の端(ナビバー側と上端)に見えない細い帯を置き、"
                 + "そこから始まったスワイプを自分で見つけて、バーと一緒に出し始めます。"
                 + "そのかわり、全画面のときは帯の中のタッチがアプリに届きません。"
                 + "帯は「位置合わせ用の枠」をオンにすると赤く見えます。", 15);
-        check("スワイプを先読みする", Prefs.EDGE_CATCH, true);
+        check("スワイプを先読みする(実験)", Prefs.EDGE_CATCH, false);
         intSlider("帯の幅", Prefs.EDGE_CATCH_DP, Prefs.DEFAULT_EDGE_CATCH_DP, 2, 24,
                 v -> v + "dp(" + Math.round(v * getResources().getDisplayMetrics().density) + "px)");
 

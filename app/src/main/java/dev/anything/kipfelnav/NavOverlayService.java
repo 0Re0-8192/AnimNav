@@ -196,7 +196,7 @@ public class NavOverlayService extends AccessibilityService {
         if (navCatcher == null) {
             return;
         }
-        boolean on = ticking && prefs.getBoolean(Prefs.EDGE_CATCH, true) && overlay.waitingForSwipe();
+        boolean on = ticking && prefs.getBoolean(Prefs.EDGE_CATCH, false) && overlay.waitingForSwipe();
         boolean guides = prefs.getBoolean(Prefs.GUIDES, false);
         int size = Math.max(1, Math.round(prefs.getInt(Prefs.EDGE_CATCH_DP, Prefs.DEFAULT_EDGE_CATCH_DP)
                 * getResources().getDisplayMetrics().density));
