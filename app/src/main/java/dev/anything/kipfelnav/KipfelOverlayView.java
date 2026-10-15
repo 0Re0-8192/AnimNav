@@ -532,11 +532,13 @@ class KipfelOverlayView extends View {
             }
             int half = Math.round(size / 2);
             // 横からのスライド:画面の外(右端 / 下端)から、いつもの位置まで
+            // (一列のときは、一番左(上)のボタンが外に出る距離を3つに共通で使う)
             if (enterOff > 0f) {
+                boolean row = enterStyle == Prefs.ENTER_ROW;
                 if (side == Side.BOTTOM) {
-                    cx += enterOff * (w - cx + half);
+                    cx += enterOff * (row ? w * (1f - (center - spacing)) + half : w - cx + half);
                 } else {
-                    cy += enterOff * (h - cy + half);
+                    cy += enterOff * (row ? h * (1f - (center - spacing)) + half : h - cy + half);
                 }
             }
             int x0 = Math.round(cx) - half;
@@ -559,9 +561,11 @@ class KipfelOverlayView extends View {
             return 0f;
         }
         long t = SystemClock.uptimeMillis() - enterStart;
-        // 動き出しのずらし:右(下)から順 / 左(上)から順
-        long delay = style == Prefs.ENTER_LEFT_FIRST ? i * ENTER_STAGGER_MS : (2 - i) * ENTER_STAGGER_MS;
-        if (t >= ENTER_MS + 2 * ENTER_STAGGER_MS) {
+        // 動き出しのずらし:右(下)から順 / 左(上)から順 / 一列(ずらさない)
+        long delay = style == Prefs.ENTER_LEFT_FIRST ? i * ENTER_STAGGER_MS
+                : style == Prefs.ENTER_ROW ? 0 : (2 - i) * ENTER_STAGGER_MS;
+        long total = ENTER_MS + (style == Prefs.ENTER_ROW ? 0 : 2 * ENTER_STAGGER_MS);
+        if (t >= total) {
             enterStart = 0;
             return 0f;
         }
