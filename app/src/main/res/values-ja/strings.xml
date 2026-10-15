@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="service_description">ナビゲーションバー(3ボタン)のボタンの上に、取り込んだ画像を動かして重ねて表示します。タップはすべて下の本物のボタンに素通りします。ナビゲーションバーが出ているかを知るために、ウィンドウの種類・位置・タイトルだけを見ます。ウィンドウの中身(文字など)は読み取りません。</string>
+
+    <string name="status_on">重ね描き:オン</string>
+    <string name="status_off">重ね描き:オフ</string>
+    <string name="status_on_hint">ナビゲーションバーの上に描いています。</string>
+    <string name="status_off_hint">「準備」の手順でオンにしてください。</string>
+
+    <string name="section_setup">準備</string>
+    <string name="setup_steps">1. 「アプリ情報」→ 右上の︙ →「制限付き設定を許可」(ファイルから入れたときだけ必要です)\n2. 「アクセシビリティ設定」→ インストール済みアプリ →「AnimNav」をオン\n3. ナビバーを着せ替えるアプリ(Good Lock の NavStar など)で、ボタンのアイコンを透明な画像にしてください(本物のアイコンが透けないように)</string>
+    <string name="btn_app_info">アプリ情報を開く</string>
+    <string name="btn_accessibility">アクセシビリティ設定を開く</string>
+
+    <string name="section_images">画像</string>
+    <string name="images_help">ボタンごとに画像を選びます。GIF・WebP(アニメも可)、PNG 1枚、PNG 連番を固めた ZIP に対応。「キーボードを閉じる」を設定しないと、キーボード表示中も「戻る」の絵のままです。</string>
+    <string name="slot_back">戻る</string>
+    <string name="slot_home">ホーム</string>
+    <string name="slot_recents">履歴</string>
+    <string name="slot_hidekb">キーボードを閉じる</string>
+    <string name="slot_not_set">未設定</string>
+    <string name="slot_not_set_hidekb">未設定(戻るの絵を使います)</string>
+    <string name="btn_choose">選ぶ</string>
+    <string name="btn_remove">外す</string>
+    <string name="image_desc_animated">%1$s アニメ · %2$d px</string>
+    <string name="image_desc_still">PNG · %d px</string>
+    <string name="image_desc_frames">PNG 連番 · %1$d コマ · %2$d px</string>
+    <string name="frame_length">PNG・PNG 連番の 1 コマの長さ:%d ms</string>
+    <string name="toast_imported">%sを取り込みました</string>
+    <string name="toast_import_failed">取り込めませんでした:%s</string>
+    <string name="err_unsupported">GIF・WebP・PNG・ZIP のどれでもありません</string>
+    <string name="err_save">保存できませんでした</string>
+    <string name="err_too_many_frames">コマが多すぎます(%d まで)</string>
+    <string name="err_zip_no_png">ZIP の中に PNG がありません</string>
+    <string name="err_png_unreadable">PNG を読めません</string>
+    <string name="err_too_large">画像が大きすぎます(%d px まで)</string>
+    <string name="err_open">開けません</string>
+
+    <string name="section_entrance">スワイプで出したときの入り方</string>
+    <string name="entrance_help">全画面のアプリでスワイプして出したナビバーは、Android の都合で少し遅れて分かるので、バーが先に出たあとに、横から滑り込んで出ます。その入り方を選べます。</string>
+    <string name="entrance_right_first">右から順に</string>
+    <string name="entrance_left_first">左から順に</string>
+    <string name="entrance_row">一列</string>
+    <string name="btn_preview">出方を試す</string>
+
+    <string name="section_position">位置合わせ · %s</string>
+    <string name="screen_small">小さい画面</string>
+    <string name="screen_large">大きい画面</string>
+    <string name="screen_with_side">%s・ナビバーが横</string>
+    <string name="position_help">小さい画面、大きい画面(幅 600dp 以上。開いた折りたたみ端末など)、ナビバーが横にあるとき(カバー画面の横向きなど)で、別々に保存されます。合わせたい状態でこのアプリを開いてください。初期値は Galaxy Z Fold7 + NavStar での実測なので、ほかの端末では合わせ直しが必要です。</string>
+    <string name="sw_guides">位置合わせ用の枠を表示</string>
+    <string name="sw_reverse">ボタンの並びが「履歴・ホーム・戻る」</string>
+    <string name="sw_snap">ドットをくっきり(整数倍で拡大)</string>
+    <string name="pos_center">横位置(真ん中のボタン):%s</string>
+    <string name="pos_center_side">縦位置(真ん中のボタン):%s</string>
+    <string name="pos_spacing">ボタンの間隔:%s</string>
+    <string name="pos_size">大きさ(ナビバーの高さに対して):%s</string>
+    <string name="pos_size_side">大きさ(ナビバーの幅に対して):%s</string>
+    <string name="pos_offset">上下(+で下へ):%s</string>
+    <string name="pos_offset_side">内側・外側(+で画面の内側へ):%s</string>
+    <string name="btn_reset_pos">この位置を初期値に戻す</string>
+
+    <string name="section_experimental">スワイプの先読み(実験)</string>
+    <string name="experimental_help">音ゲーなど、画面の端からのタッチを使うアプリでは使わないでください。オンにすると、アプリが全画面のあいだだけ、画面の端(ナビバー側と、ステータスバーも隠れているときは上端)に見えない細い帯を置きます。帯から始まったスワイプをすぐ見つけるので、バーと一緒に画像が出始めます。そのかわり、帯の中から始まるタッチはアプリに届きません。「位置合わせ用の枠」をオンにすると、帯が赤く見えます。</string>
+    <string name="sw_edge">スワイプを先読みする</string>
+    <string name="edge_width">帯の幅:%1$d dp(%2$d px)</string>
+
+    <string name="section_keyboard">キーボードの確認</string>
+    <string name="keyboard_hint">ここをタップしてキーボードを出す</string>
+
+    <string name="section_about">このアプリについて</string>
+    <string name="about_body">AnimNav は、ナビゲーションバーが出ているかを知るために、ウィンドウの種類・位置・タイトルだけを見ます。画面の内容は読まず、通信もせず、何も収集しません。取り込んだ画像はこの端末の中にだけ置かれます。</string>
+    <string name="about_version">バージョン %s</string>
+
+    <string name="dbg_head">%1$s  ナビバー %2$s  キーボード %3$s%4$s</string>
+    <string name="dbg_signals">画面情報 %1$s / ウィンドウ一覧 %2$s / 本来 %3$d px / 沈み %4$d px%5$s</string>
+    <string name="dbg_predict">先読み 当たり %1$d / 空振り %2$d / 間に合わず %3$d%4$s</string>
+    <string name="dbg_predicting">  (先読み中)</string>
+    <string name="dbg_swipe"> (スワイプ)</string>
+    <string name="dbg_locked">  ロック中</string>
+    <string name="dbg_none">なし</string>
+    <string name="dbg_yes">あり</string>
+    <string name="dbg_bottom">下</string>
+    <string name="dbg_right">右</string>
+    <string name="dbg_left">左</string>
+    <string name="win_app">アプリ</string>
+    <string name="win_ime">キーボード</string>
+    <string name="win_system">システム</string>
+    <string name="win_overlay">重ね描き</string>
+    <string name="win_divider">分割線</string>
+    <string name="win_other">種類 %d</string>
+</resources>

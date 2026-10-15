@@ -1,5 +1,6 @@
-package dev.anything.kipfelnav;
+package app.animnav;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Resources;
 import android.view.MotionEvent;
@@ -7,7 +8,7 @@ import android.view.View;
 
 /**
  * 全画面のアプリでナビバーが隠れているあいだだけ、画面の端に置く見えない細い帯。
- * 端からのスワイプを自分で見つけて、ナビバーが出てくるより先にキプフェルを出し始める
+ * 端からのスワイプを自分で見つけて、ナビバーが出てくるより先に絵を出し始める
  * (ウィンドウ一覧は、バーが出きってから届くので遅い)。
  *
  * - 帯の中のタッチはアプリに届かなくなるので、帯は細くしておく。
@@ -44,6 +45,7 @@ class EdgeCatcher extends View {
         edge = e;
     }
 
+    @SuppressLint("ClickableViewAccessibility") // 見えない帯で、クリック操作の対象ではない
     @Override
     public boolean onTouchEvent(MotionEvent e) {
         switch (e.getActionMasked()) {

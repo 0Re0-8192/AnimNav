@@ -3,19 +3,28 @@ plugins {
 }
 
 android {
-    namespace "dev.anything.kipfelnav"
+    namespace "app.animnav"
     compileSdk 36
 
     defaultConfig {
-        applicationId "dev.anything.kipfelnav"
+        applicationId "app.animnav"
         minSdk 30
         targetSdk 36
-        versionCode 14
-        versionName "0.14"
+        versionCode 15
+        versionName "0.15"
+    }
+
+    androidResources {
+        // Material Components ships many translations; keep only the languages this app supports
+        localeFilters = ['en', 'ja']
     }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    implementation 'com.google.android.material:material:1.12.0'
 }

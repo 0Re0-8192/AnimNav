@@ -1,4 +1,4 @@
-package dev.anything.kipfelnav;
+package app.animnav;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -10,7 +10,7 @@ import android.content.SharedPreferences;
  */
 final class Prefs {
 
-    static final String NAME = "kipfelnav";
+    static final String NAME = "animnav";
     static final String COVER = "cover";
     static final String MAIN = "main";
 

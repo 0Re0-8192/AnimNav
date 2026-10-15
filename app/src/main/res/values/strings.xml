@@ -1,6 +1,103 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AnimNav</string>
-    <string name="service_name">AnimNav</string>
-    <string name="service_description">ナビゲーションバーのボタンの上に、取り込んだ画像を動かして重ねて表示します。タップはすべて下のボタンに素通りします。ナビゲーションバーが出ているかを知るためにウィンドウの種類と位置だけを見ます。ウィンドウの中身(文字など)は読み取りません。</string>
+    <string name="app_name" translatable="false">AnimNav</string>
+    <string name="service_name" translatable="false">AnimNav</string>
+    <string name="service_description">Draws the images you choose over the buttons of the 3-button navigation bar. Taps pass straight through to the real buttons. To know when the bar is showing, it only looks at the type, position and title of windows; it never reads what is inside them.</string>
+
+    <!-- Status -->
+    <string name="status_on">Overlay is on</string>
+    <string name="status_off">Overlay is off</string>
+    <string name="status_on_hint">AnimNav is drawing over your navigation bar.</string>
+    <string name="status_off_hint">Follow the steps in Setup to turn it on.</string>
+
+    <!-- Setup -->
+    <string name="section_setup">Setup</string>
+    <string name="setup_steps">1. Open App info → ⋮ (top right) → Allow restricted settings. This is only needed when the app was installed from a file.\n2. Open Accessibility settings → Installed apps → AnimNav → turn it on.\n3. In your navigation bar app (for example Good Lock NavStar), set the button icons to transparent images so the real icons don\'t show through.</string>
+    <string name="btn_app_info">Open app info</string>
+    <string name="btn_accessibility">Open accessibility settings</string>
+
+    <!-- Images -->
+    <string name="section_images">Images</string>
+    <string name="images_help">Choose an image for each button: a GIF or WebP (animated is fine), a single PNG, or a ZIP of numbered PNG frames. If you don\'t set one for “Close keyboard”, the Back image is used while the keyboard is up.</string>
+    <string name="slot_back">Back</string>
+    <string name="slot_home">Home</string>
+    <string name="slot_recents">Recents</string>
+    <string name="slot_hidekb">Close keyboard</string>
+    <string name="slot_not_set">Not set</string>
+    <string name="slot_not_set_hidekb">Not set (uses the Back image)</string>
+    <string name="btn_choose">Choose</string>
+    <string name="btn_remove">Remove</string>
+    <string name="image_desc_animated">%1$s animation · %2$d px</string>
+    <string name="image_desc_still">PNG · %d px</string>
+    <string name="image_desc_frames">PNG sequence · %1$d frames · %2$d px</string>
+    <string name="frame_length">Frame length for PNGs and PNG sequences: %d ms</string>
+    <string name="toast_imported">%s imported</string>
+    <string name="toast_import_failed">Couldn\'t import: %s</string>
+    <string name="err_unsupported">Not a GIF, WebP, PNG or ZIP file</string>
+    <string name="err_save">Couldn\'t save the file</string>
+    <string name="err_too_many_frames">Too many frames (max %d)</string>
+    <string name="err_zip_no_png">There are no PNG files in the ZIP</string>
+    <string name="err_png_unreadable">Couldn\'t read the PNG</string>
+    <string name="err_too_large">The image is too large (max %d px)</string>
+    <string name="err_open">Couldn\'t open the file</string>
+
+    <!-- Entrance -->
+    <string name="section_entrance">Entrance after a swipe</string>
+    <string name="entrance_help">In fullscreen apps, Android reports the bar you swipe in a moment late, so the images slide in from the side after the bar is already up. Choose how they slide in.</string>
+    <string name="entrance_right_first">Right first</string>
+    <string name="entrance_left_first">Left first</string>
+    <string name="entrance_row">As a row</string>
+    <string name="btn_preview">Preview</string>
+
+    <!-- Position -->
+    <string name="section_position">Position · %s</string>
+    <string name="screen_small">Small screen</string>
+    <string name="screen_large">Large screen</string>
+    <string name="screen_with_side">%s, bar on the side</string>
+    <string name="position_help">Saved separately for small screens, large screens (600 dp wide or more, such as an unfolded foldable) and a side navigation bar (for example a cover screen in landscape). Open this app in the state you want to adjust. The defaults were measured on a Galaxy Z Fold7 with NavStar, so other devices will need adjusting.</string>
+    <string name="sw_guides">Show alignment guides</string>
+    <string name="sw_reverse">Button order is Recents · Home · Back</string>
+    <string name="sw_snap">Crisp pixels (scale by whole numbers)</string>
+    <string name="pos_center">Middle button position: %s</string>
+    <string name="pos_center_side">Middle button position (vertical): %s</string>
+    <string name="pos_spacing">Button spacing: %s</string>
+    <string name="pos_size">Size (relative to the bar height): %s</string>
+    <string name="pos_size_side">Size (relative to the bar width): %s</string>
+    <string name="pos_offset">Up / down (+ moves down): %s</string>
+    <string name="pos_offset_side">In / out (+ moves toward the screen): %s</string>
+    <string name="btn_reset_pos">Reset this position</string>
+
+    <!-- Experimental -->
+    <string name="section_experimental">Swipe prediction (experimental)</string>
+    <string name="experimental_help">Don\'t use this in rhythm games or other apps that use touches at the screen edge. When it is on, and only while an app is fullscreen, thin invisible strips are placed on the screen edges (the navigation bar side, and the top edge when the status bar is hidden too). A swipe that starts in a strip is noticed right away, so the images start to appear together with the bar. Touches that start inside a strip don\'t reach the app. With alignment guides on, the strips show in red.</string>
+    <string name="sw_edge">Predict swipes</string>
+    <string name="edge_width">Strip width: %1$d dp (%2$d px)</string>
+
+    <!-- Keyboard test -->
+    <string name="section_keyboard">Keyboard test</string>
+    <string name="keyboard_hint">Tap here to open the keyboard</string>
+
+    <!-- About -->
+    <string name="section_about">About</string>
+    <string name="about_body">AnimNav only looks at the type, position and title of windows to know when the navigation bar is showing. It doesn\'t read what is on the screen, has no network access and collects nothing. The images you choose stay on this device.</string>
+    <string name="about_version">Version %s</string>
+
+    <!-- Debug panel (alignment guides) -->
+    <string name="dbg_head">%1$s  nav bar: %2$s  keyboard: %3$s%4$s</string>
+    <string name="dbg_signals">metrics %1$s / windows %2$s / full %3$d px / slide %4$d px%5$s</string>
+    <string name="dbg_predict">prediction hit %1$d / miss %2$d / late %3$d%4$s</string>
+    <string name="dbg_predicting">  (predicting)</string>
+    <string name="dbg_swipe"> (swipe)</string>
+    <string name="dbg_locked">  locked</string>
+    <string name="dbg_none">none</string>
+    <string name="dbg_yes">yes</string>
+    <string name="dbg_bottom">bottom</string>
+    <string name="dbg_right">right</string>
+    <string name="dbg_left">left</string>
+    <string name="win_app">app</string>
+    <string name="win_ime">keyboard</string>
+    <string name="win_system">system</string>
+    <string name="win_overlay">overlay</string>
+    <string name="win_divider">divider</string>
+    <string name="win_other">type %d</string>
 </resources>

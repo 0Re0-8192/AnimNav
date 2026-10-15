@@ -1,4 +1,4 @@
-package dev.anything.kipfelnav;
+package app.animnav;
 
 import android.animation.ValueAnimator;
 import android.app.KeyguardManager;
@@ -40,7 +40,7 @@ import java.util.Map;
  * - ロック中(パスワード入力画面など)は、戻るだけを描く。
  * - キーボード表示中は、戻るの位置に「キーボードを閉じる」の絵を描く。
  */
-class KipfelOverlayView extends View {
+class OverlayView extends View {
 
     enum Side { BOTTOM, RIGHT, LEFT }
 
@@ -111,7 +111,7 @@ class KipfelOverlayView extends View {
     private boolean sinkOnFade = true;
     private ValueAnimator fade;
 
-    KipfelOverlayView(Context context) {
+    OverlayView(Context context) {
         super(context);
         windowManager = context.getSystemService(WindowManager.class);
         keyguardManager = context.getSystemService(KeyguardManager.class);
@@ -357,7 +357,8 @@ class KipfelOverlayView extends View {
             w.getBoundsInScreen(wb);
             CharSequence title = w.getTitle();
             String t = title == null ? "" : title.toString();
-            boolean named = t.contains("avigation") || t.contains("ナビゲーション");
+            boolean named = t.contains("avigation") || t.contains("ナビゲーション")
+                    || t.contains("탐색");
             boolean candidate = named || w.getType() == AccessibilityWindowInfo.TYPE_SYSTEM;
             Side s = null;
             int th = 0;
@@ -395,8 +396,8 @@ class KipfelOverlayView extends View {
                 foundSlide = Math.max(0, Math.min(full, foundSlide));
             }
             if (guides && windowLines.size() < 12) {
-                windowLines.add((s != null ? "★" : "・") + typeName(w.getType()) + " " + wb.toShortString()
-                        + (t.isEmpty() ? "" : " 「" + t + "」"));
+                windowLines.add((s != null ? "★ " : "· ") + typeName(w.getType()) + " " + wb.toShortString()
+                        + (t.isEmpty() ? "" : " \"" + t + "\""));
             }
         }
         windowSide = found;
@@ -404,20 +405,21 @@ class KipfelOverlayView extends View {
         windowSlide = foundSlide;
     }
 
-    private static String typeName(int type) {
+    private String typeName(int type) {
+        Context c = getContext();
         switch (type) {
             case AccessibilityWindowInfo.TYPE_APPLICATION:
-                return "アプリ";
+                return c.getString(R.string.win_app);
             case AccessibilityWindowInfo.TYPE_INPUT_METHOD:
-                return "キーボード";
+                return c.getString(R.string.win_ime);
             case AccessibilityWindowInfo.TYPE_SYSTEM:
-                return "システム";
+                return c.getString(R.string.win_system);
             case AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY:
-                return "重ね描き";
+                return c.getString(R.string.win_overlay);
             case AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER:
-                return "分割線";
+                return c.getString(R.string.win_divider);
             default:
-                return "種類" + type;
+                return c.getString(R.string.win_other, type);
         }
     }
 
@@ -585,15 +587,21 @@ class KipfelOverlayView extends View {
     /** ガイド表示中の確認用の文字。 */
     private void drawDebug(Canvas c) {
         List<String> lines = new ArrayList<>();
-        String sideName = side == Side.RIGHT ? "右" : side == Side.LEFT ? "左" : "下";
-        lines.add((Prefs.MAIN.equals(screen) ? "開いた画面" : "閉じた画面")
-                + "  ナビバー " + (shownNow ? sideName : "なし")
-                + "  キーボード " + (imeVisible ? "あり" : "なし") + (locked ? "  ロック中" : ""));
-        lines.add("画面情報 " + (metricsSide == null ? "なし" : metricsSide + " " + metricsThick + "px")
-                + " / ウィンドウ一覧 " + (windowSide == null ? "なし" : windowSide + " " + windowThick + "px")
-                + " / 本来 " + thick + "px / 沈み " + slide + "px" + (windowOnly ? " (スワイプ)" : ""));
-        lines.add("先読み 当たり " + predictHits + " / 空振り " + predictMisses + " / 間に合わず " + lateShows
-                + (predictStart != 0 ? "  (先読み中)" : ""));
+        Context ctx = getContext();
+        String none = ctx.getString(R.string.dbg_none);
+        String sideName = ctx.getString(side == Side.RIGHT ? R.string.dbg_right
+                : side == Side.LEFT ? R.string.dbg_left : R.string.dbg_bottom);
+        lines.add(ctx.getString(R.string.dbg_head,
+                ctx.getString(Prefs.MAIN.equals(screen) ? R.string.screen_large : R.string.screen_small),
+                shownNow ? sideName : none,
+                ctx.getString(imeVisible ? R.string.dbg_yes : R.string.dbg_none),
+                locked ? ctx.getString(R.string.dbg_locked) : ""));
+        lines.add(ctx.getString(R.string.dbg_signals,
+                metricsSide == null ? none : metricsSide + " " + metricsThick + "px",
+                windowSide == null ? none : windowSide + " " + windowThick + "px",
+                thick, slide, windowOnly ? ctx.getString(R.string.dbg_swipe) : ""));
+        lines.add(ctx.getString(R.string.dbg_predict, predictHits, predictMisses, lateShows,
+                predictStart != 0 ? ctx.getString(R.string.dbg_predicting) : ""));
         lines.addAll(windowLines);
         float lineH = text.getTextSize() * 1.3f;
         float maxW = 0;

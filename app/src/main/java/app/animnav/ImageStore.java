@@ -1,4 +1,4 @@
-package dev.anything.kipfelnav;
+package app.animnav;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -25,7 +25,6 @@ import java.util.zip.ZipInputStream;
 /**
  * ボタンごとの画像の取り込みと読み込み。
  * 対応:GIF・WebP(アニメも可)、PNG 1枚、PNG 連番を固めた ZIP。
- * 旧版の「4行まとめ画像」(sheet.png)が残っていれば、画像のないボタンはそこから切り出して使う。
  */
 final class ImageStore {
 
@@ -40,17 +39,17 @@ final class ImageStore {
 
     /** 中身を見て種類を決め、そのボタンの画像として保存する。読めなければ例外。 */
     static void importInto(Context c, Slot slot, Uri uri) throws IOException {
-        byte[] bytes = readAll(c.getContentResolver().openInputStream(uri));
+        byte[] bytes = readAll(c, c.getContentResolver().openInputStream(uri));
         String ext = sniff(bytes);
         if (ext == null) {
-            throw new IOException("GIF・WebP・PNG・ZIP のどれでもありません");
+            throw new IOException(c.getString(R.string.err_unsupported));
         }
         File tmp = new File(c.getFilesDir(), "import.tmp." + ext);
         try (FileOutputStream out = new FileOutputStream(tmp)) {
             out.write(bytes);
         }
         try {
-            load(tmp, ext, Prefs.of(c).getInt(Prefs.FRAME_MS, Prefs.DEFAULT_FRAME_MS));
+            load(c, tmp, ext, Prefs.of(c).getInt(Prefs.FRAME_MS, Prefs.DEFAULT_FRAME_MS));
         } catch (IOException | RuntimeException e) {
             tmp.delete();
             throw e instanceof IOException ? (IOException) e : new IOException(e.getMessage(), e);
@@ -58,7 +57,7 @@ final class ImageStore {
         clear(c, slot);
         if (!tmp.renameTo(new File(c.getFilesDir(), "slot_" + slot.key + "." + ext))) {
             tmp.delete();
-            throw new IOException("保存できませんでした");
+            throw new IOException(c.getString(R.string.err_save));
         }
     }
 
@@ -87,20 +86,20 @@ final class ImageStore {
 
     // ---- 読み込み
 
-    /** そのボタンの画像。なければ旧版のまとめ画像から、それもなければ null。 */
+    /** そのボタンの画像。なければ null。 */
     static SlotImage load(Context c, Slot slot) {
         int frameMs = Prefs.of(c).getInt(Prefs.FRAME_MS, Prefs.DEFAULT_FRAME_MS);
         for (String e : EXTS) {
             File f = new File(c.getFilesDir(), "slot_" + slot.key + "." + e);
             if (f.exists()) {
                 try {
-                    return load(f, e, frameMs);
+                    return load(c, f, e, frameMs);
                 } catch (IOException | RuntimeException ignored) {
                     return null;
                 }
             }
         }
-        return loadLegacy(c, slot, frameMs);
+        return null;
     }
 
     /** 画像の出どころ(取り込み画面の表示用)。 */
@@ -113,7 +112,7 @@ final class ImageStore {
         return false;
     }
 
-    private static SlotImage load(File f, String ext, int frameMs) throws IOException {
+    private static SlotImage load(Context c, File f, String ext, int frameMs) throws IOException {
         switch (ext) {
             case "gif":
             case "webp": {
@@ -123,20 +122,20 @@ final class ImageStore {
                     return new SlotImage.Animated((AnimatedImageDrawable) d, kind);
                 }
                 Bitmap b = ((BitmapDrawable) d).getBitmap();
-                return new SlotImage.Frames(Collections.singletonList(b), frameMs, kind);
+                return new SlotImage.Frames(Collections.singletonList(b), frameMs);
             }
             case "png": {
-                Bitmap b = decodePng(readAll(new FileInputStream(f)));
-                return new SlotImage.Frames(Collections.singletonList(b), frameMs, "PNG");
+                Bitmap b = decodePng(c, readAll(c, new FileInputStream(f)));
+                return new SlotImage.Frames(Collections.singletonList(b), frameMs);
             }
             case "zip":
-                return new SlotImage.Frames(readZip(f), frameMs, "PNG連番");
+                return new SlotImage.Frames(readZip(c, f), frameMs);
             default:
                 throw new IOException("unknown");
         }
     }
 
-    private static List<Bitmap> readZip(File f) throws IOException {
+    private static List<Bitmap> readZip(Context c, File f) throws IOException {
         List<String> names = new ArrayList<>();
         List<byte[]> data = new ArrayList<>();
         try (ZipInputStream z = new ZipInputStream(new FileInputStream(f))) {
@@ -149,14 +148,14 @@ final class ImageStore {
                     continue;
                 }
                 if (names.size() >= MAX_FRAMES) {
-                    throw new IOException("コマが多すぎます(" + MAX_FRAMES + "まで)");
+                    throw new IOException(c.getString(R.string.err_too_many_frames, MAX_FRAMES));
                 }
                 names.add(base);
                 data.add(readAllNoClose(z));
             }
         }
         if (names.isEmpty()) {
-            throw new IOException("ZIP の中に PNG がありません");
+            throw new IOException(c.getString(R.string.err_zip_no_png));
         }
         // ファイル名の順(数字は数として比べる:2.png < 10.png)
         List<Integer> order = new ArrayList<>();
@@ -166,48 +165,27 @@ final class ImageStore {
         order.sort((a, b) -> naturalCompare(names.get(a), names.get(b)));
         List<Bitmap> frames = new ArrayList<>();
         for (int i : order) {
-            frames.add(decodePng(data.get(i)));
+            frames.add(decodePng(c, data.get(i)));
         }
         return frames;
     }
 
-    private static SlotImage loadLegacy(Context c, Slot slot, int frameMs) {
-        File f = new File(c.getFilesDir(), "sheet.png");
-        if (!f.exists()) {
-            return null;
-        }
-        BitmapFactory.Options o = new BitmapFactory.Options();
-        o.inScaled = false;
-        Bitmap sheet = BitmapFactory.decodeFile(f.getPath(), o);
-        if (sheet == null || sheet.getHeight() % 4 != 0) {
-            return null;
-        }
-        int cell = sheet.getHeight() / 4;
-        int n = sheet.getWidth() / cell;
-        List<Bitmap> frames = new ArrayList<>();
-        for (int i = 0; i < n; i++) {
-            // 1コマずつ別の Bitmap に切り出す(隣のコマがにじまない)
-            frames.add(Bitmap.createBitmap(sheet, i * cell, slot.legacyRow * cell, cell, cell));
-        }
-        return new SlotImage.Frames(frames, frameMs, "旧まとめ画像");
-    }
-
-    private static Bitmap decodePng(byte[] bytes) throws IOException {
+    private static Bitmap decodePng(Context c, byte[] bytes) throws IOException {
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inScaled = false;
         Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);
         if (b == null) {
-            throw new IOException("PNG を読めません");
+            throw new IOException(c.getString(R.string.err_png_unreadable));
         }
         if (b.getWidth() > MAX_SIDE || b.getHeight() > MAX_SIDE) {
-            throw new IOException("画像が大きすぎます(" + MAX_SIDE + "px まで)");
+            throw new IOException(c.getString(R.string.err_too_large, MAX_SIDE));
         }
         return b;
     }
 
-    private static byte[] readAll(InputStream in) throws IOException {
+    private static byte[] readAll(Context c, InputStream in) throws IOException {
         if (in == null) {
-            throw new IOException("開けません");
+            throw new IOException(c.getString(R.string.err_open));
         }
         try (InputStream s = in) {
             return readAllNoClose(s);

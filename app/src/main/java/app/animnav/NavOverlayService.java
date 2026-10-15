@@ -1,4 +1,4 @@
-package dev.anything.kipfelnav;
+package app.animnav;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.BroadcastReceiver;
@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 画面全体に、タップを素通りさせる透明な層を1枚重ねて、ナビバーの上にキプフェルを描く。
+ * 画面全体に、タップを素通りさせる透明な層を1枚重ねて、ナビバーの上に絵を描く。
  * アクセシビリティの重ね描き層は、ナビバーやキーボードより上に来る。
  * 画面の内容は読まない。
  */
@@ -36,11 +36,11 @@ public class NavOverlayService extends AccessibilityService {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private WindowManager windowManager;
-    private KipfelOverlayView overlay;
+    private OverlayView overlay;
     private WindowManager.LayoutParams lp;
     private SharedPreferences prefs;
     private boolean ticking;
-    private KipfelOverlayView.Side appliedSide;
+    private OverlayView.Side appliedSide;
     private boolean appliedGuides;
     // 全画面のときに端からのスワイプを先に見つける帯(ナビバーの辺と、上端)
     private Catcher navCatcher;
@@ -89,7 +89,7 @@ public class NavOverlayService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         windowManager = getSystemService(WindowManager.class);
-        overlay = new KipfelOverlayView(this);
+        overlay = new OverlayView(this);
 
         prefs = Prefs.of(this);
         lp = new WindowManager.LayoutParams(
@@ -104,7 +104,7 @@ public class NavOverlayService extends AccessibilityService {
                 PixelFormat.TRANSLUCENT);
         lp.setFitInsetsTypes(0);
         lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-        lp.setTitle("KipfelNavOverlay");
+        lp.setTitle("AnimNavOverlay");
         setLayout();
         windowManager.addView(overlay, lp);
         navCatcher = new Catcher();
@@ -115,7 +115,11 @@ public class NavOverlayService extends AccessibilityService {
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_SCREEN_OFF);
         f.addAction(Intent.ACTION_SCREEN_ON);
-        registerReceiver(screenReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenReceiver, f, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(screenReceiver, f); // 画面の ON/OFF はシステムからの通知だけ
+        }
 
         if (getSystemService(PowerManager.class).isInteractive()) {
             startTicking();
@@ -237,7 +241,7 @@ public class NavOverlayService extends AccessibilityService {
             lp.setFitInsetsTypes(0);
             lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
             lp.gravity = Gravity.BOTTOM | Gravity.START;
-            lp.setTitle("KipfelNavEdge");
+            lp.setTitle("AnimNavEdge");
             windowManager.addView(view, lp);
         }
 

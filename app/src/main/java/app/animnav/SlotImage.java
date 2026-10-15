@@ -1,5 +1,6 @@
-package dev.anything.kipfelnav;
+package app.animnav;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -19,7 +20,7 @@ abstract class SlotImage {
     abstract void draw(Canvas c, Rect dst, int alpha);
 
     /** 表示用の説明(取り込み画面に出す)。 */
-    abstract String describe();
+    abstract String describe(Context c);
 
     void start() {
     }
@@ -51,8 +52,8 @@ abstract class SlotImage {
         }
 
         @Override
-        String describe() {
-            return kind + " アニメ";
+        String describe(Context c) {
+            return c.getString(R.string.image_desc_animated, kind, intrinsicSize());
         }
 
         @Override
@@ -74,14 +75,12 @@ abstract class SlotImage {
     static final class Frames extends SlotImage {
         private final List<Bitmap> frames;
         private final long frameMs;
-        private final String kind;
         private final Paint paint = new Paint();
         private final Rect src = new Rect();
 
-        Frames(List<Bitmap> frames, long frameMs, String kind) {
+        Frames(List<Bitmap> frames, long frameMs) {
             this.frames = frames;
             this.frameMs = Math.max(16, frameMs);
-            this.kind = kind;
             paint.setFilterBitmap(false); // ドット絵なのでぼかさない
         }
 
@@ -100,8 +99,10 @@ abstract class SlotImage {
         }
 
         @Override
-        String describe() {
-            return frames.size() == 1 ? kind : kind + " " + frames.size() + "コマ";
+        String describe(Context c) {
+            return frames.size() == 1
+                    ? c.getString(R.string.image_desc_still, intrinsicSize())
+                    : c.getString(R.string.image_desc_frames, frames.size(), intrinsicSize());
         }
     }
 }
