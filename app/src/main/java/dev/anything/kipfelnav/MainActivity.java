@@ -55,12 +55,12 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(pad, pad * 3, pad, pad * 2);
 
-        heading("KipfelNav", 22);
+        heading("AnimNav", 22);
         status = text("", 16);
 
         heading("1. 準備", 18);
         text("「アプリ情報」→ 右上の︙ →「制限付き設定を許可」をしてから、"
-                + "「アクセシビリティ設定」→ インストール済みアプリ →「KipfelNav」をオン。", 15);
+                + "「アクセシビリティ設定」→ インストール済みアプリ →「AnimNav」をオン。", 15);
         button("アプリ情報を開く", () -> startActivity(new Intent(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.fromParts("package", getPackageName(), null))));
