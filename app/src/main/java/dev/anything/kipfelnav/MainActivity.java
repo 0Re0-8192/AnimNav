@@ -100,8 +100,11 @@ public class MainActivity extends Activity {
         text("全画面のアプリでスワイプしてナビバーを出すと、Android の都合でキプフェルはバーより遅れて、"
                 + "横から滑り込んで出ます。その入り方を選べます。「出方を試す」で、いまのナビバー上でやり直します。", 15);
         RadioGroup enter = new RadioGroup(this);
-        String[] enterLabels = {"右のボタンから順に", "左のボタンから順に(並びを保って入ってくる)", "3つを一列のまま"};
+        String[] enterLabels = {"右のボタンから順に", "左のボタンから順に(並びを保って入ってくる)"};
         int enterNow = prefs.getInt(Prefs.ENTER_STYLE, Prefs.ENTER_RIGHT_FIRST);
+        if (enterNow < 0 || enterNow >= enterLabels.length) {
+            enterNow = Prefs.ENTER_RIGHT_FIRST;
+        }
         for (int i = 0; i < enterLabels.length; i++) {
             RadioButton rb = new RadioButton(this);
             rb.setId(1000 + i);
