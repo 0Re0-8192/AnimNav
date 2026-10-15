@@ -47,6 +47,11 @@ class KipfelOverlayView extends View {
     private static final long FADE_MS = 220;
     // スワイプで出したバーが出入りするとき。位置はバー自体に合わせるので、フェードは短く
     private static final long QUICK_FADE_MS = 70;
+    // スワイプで出したバーに遅れて気づいたときの出方:バーはもう出ているので、横からスライドして入ってくる
+    // (下のバーなら画面の右端から、横のバーなら画面の下端から)。右(下)のボタンから順に着く
+    private static final long ENTER_MS = 320;
+    private static final long ENTER_STAGGER_MS = 70;
+    private static final Interpolator ENTER = new DecelerateInterpolator(2f);
     // 先読み:Android がバーを出すときの動き(長さと緩急)に合わせて、外から滑り込ませる
     private static final long PREDICT_SLIDE_MS = 275;
     private static final Interpolator BAR_IN = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
@@ -91,6 +96,8 @@ class KipfelOverlayView extends View {
     private int thick;                 // ナビバーの本来の太さ
     private int slide;
     private final List<String> windowLines = new ArrayList<>();
+
+    private long enterStart;           // 0 = 横からのスライド中ではない
 
     // 先読み
     private long predictStart;         // 0 = 先読みしていない
@@ -177,6 +184,9 @@ class KipfelOverlayView extends View {
         boolean wasWindowOnly = windowOnly;
         measure(windows);
         if (wasShown != shownNow) {
+            if (shownNow) {
+                enterStart = 0;
+            }
             if (shownNow && predictStart != 0) {
                 // 先読み:位置は時間から決める(currentSlide)ので、独自の浮き上がりはしない
                 animateShown(true, QUICK_FADE_MS, false);
@@ -184,11 +194,11 @@ class KipfelOverlayView extends View {
                 // スワイプで出したバーは、一覧から消えた時点でもう沈みきっている
                 animateShown(false, QUICK_FADE_MS, false);
             } else if (shownNow && windowOnly) {
-                // スワイプで出したバーは、気づいた時点でもうバーが上がりきっていることが多い。
-                // 急に出て見えないように、ふつうの出方(下から浮き上がりながらフェード)にする。
-                // バーが途中なら、その位置(slide)ぶんが上に足されるだけで、同じ最終位置に着く
+                // スワイプで出したバーは、気づいた時点でもうバーが上がりきっている。
+                // 急に出て見えないように、バーの横からスライドして入ってくる
                 lateShows++;
-                animateShown(true, FADE_MS, true);
+                animateShown(true, QUICK_FADE_MS, false);
+                enterStart = SystemClock.uptimeMillis();
             } else {
                 animateShown(shownNow, FADE_MS, true);
             }
@@ -504,6 +514,7 @@ class KipfelOverlayView extends View {
             float along = center + (i - 1) * spacing;
             float cx;
             float cy;
+            float enterOff = enterOffset(i);
             switch (side) {
                 case RIGHT:
                     cx = w - thick / 2f - offset;
@@ -519,6 +530,14 @@ class KipfelOverlayView extends View {
                     break;
             }
             int half = Math.round(size / 2);
+            // 横からのスライド:画面の外(右端 / 下端)から、いつもの位置まで
+            if (enterOff > 0f) {
+                if (side == Side.BOTTOM) {
+                    cx += enterOff * (w - cx + half);
+                } else {
+                    cy += enterOff * (h - cy + half);
+                }
+            }
             int x0 = Math.round(cx) - half;
             int y0 = Math.round(cy) - half;
             dst.set(x0, y0, x0 + 2 * half, y0 + 2 * half);
@@ -531,6 +550,21 @@ class KipfelOverlayView extends View {
             }
         }
         c.restore();
+    }
+
+    /** i 番目のボタンが、いつもの位置まであとどれだけ(1 = 画面の外、0 = 着いた)。 */
+    private float enterOffset(int i) {
+        if (enterStart == 0) {
+            return 0f;
+        }
+        long t = SystemClock.uptimeMillis() - enterStart;
+        if (t >= ENTER_MS + 2 * ENTER_STAGGER_MS) {
+            enterStart = 0;
+            return 0f;
+        }
+        postInvalidateOnAnimation();
+        float u = (t - (2 - i) * ENTER_STAGGER_MS) / (float) ENTER_MS;
+        return 1f - ENTER.getInterpolation(Math.max(0f, Math.min(1f, u)));
     }
 
     /** ガイド表示中の確認用の文字。 */
