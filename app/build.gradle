@@ -2,6 +2,14 @@ plugins {
     id "com.android.application"
 }
 
+// Release signing: put your keystore details in keystore.properties (git-ignored).
+// Without it, assembleRelease produces an unsigned APK.
+def keystorePropsFile = rootProject.file("keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace "app.animnav"
     compileSdk 36
@@ -12,6 +20,25 @@ android {
         targetSdk 36
         versionCode 17
         versionName "0.17"
+    }
+
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            release {
+                storeFile file(keystoreProps["storeFile"])
+                storePassword keystoreProps["storePassword"]
+                keyAlias keystoreProps["keyAlias"]
+                keyPassword keystoreProps["keyPassword"]
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 
     androidResources {
