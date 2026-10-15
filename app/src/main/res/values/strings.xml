@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">KipfelNav</string>
-    <string name="service_name">KipfelNav</string>
+    <string name="app_name">AnimNav</string>
+    <string name="service_name">AnimNav</string>
     <string name="service_description">ナビゲーションバーのボタンの上に、取り込んだ画像を動かして重ねて表示します。タップはすべて下のボタンに素通りします。ナビゲーションバーが出ているかを知るためにウィンドウの種類と位置だけを見ます。ウィンドウの中身(文字など)は読み取りません。</string>
 </resources>
