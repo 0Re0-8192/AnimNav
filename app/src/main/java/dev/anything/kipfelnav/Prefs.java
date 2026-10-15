@@ -24,8 +24,11 @@ final class Prefs {
     static final String PIXEL_SNAP = "pixelSnap";       // 整数倍・整数分の1でドットをくっきり
     static final String FRAME_MS = "frameMs";           // PNG 連番の1コマの長さ
     static final String IMAGES_VERSION = "imagesVersion";
+    static final String EDGE_CATCH = "edgeCatch";       // 全画面で端からのスワイプを先読みする
+    static final String EDGE_CATCH_DP = "edgeCatchDp";  // そのための帯の幅(dp)
 
     static final int DEFAULT_FRAME_MS = 150;
+    static final int DEFAULT_EDGE_CATCH_DP = 12;
 
     private Prefs() {
     }

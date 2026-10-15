@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
@@ -41,6 +42,9 @@ public class NavOverlayService extends AccessibilityService {
     private boolean ticking;
     private KipfelOverlayView.Side appliedSide;
     private boolean appliedGuides;
+    // 全画面のときに端からのスワイプを先に見つける帯(ナビバーの辺と、上端)
+    private Catcher navCatcher;
+    private Catcher topCatcher;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -60,6 +64,9 @@ public class NavOverlayService extends AccessibilityService {
         }
         if (Prefs.GUIDES.equals(key)) {
             applyLayout();
+        }
+        if (Prefs.GUIDES.equals(key) || Prefs.EDGE_CATCH.equals(key) || Prefs.EDGE_CATCH_DP.equals(key)) {
+            updateCatchers();
         }
         overlay.invalidate();
     };
@@ -97,6 +104,8 @@ public class NavOverlayService extends AccessibilityService {
         lp.setTitle("KipfelNavOverlay");
         setLayout();
         windowManager.addView(overlay, lp);
+        navCatcher = new Catcher();
+        topCatcher = new Catcher();
 
         prefs.registerOnSharedPreferenceChangeListener(prefsListener);
 
@@ -166,6 +175,112 @@ public class NavOverlayService extends AccessibilityService {
         if (overlay.side() != appliedSide) {
             applyLayout();
         }
+        updateCatchers();
+    }
+
+    /** 端の帯から、スワイプを見つけたと知らせが来た。すぐ先読みを始めて、細かく見る周期に切り替える。 */
+    private void onEdgeSwipe() {
+        if (overlay == null || !ticking) {
+            return;
+        }
+        overlay.predictSwipe();
+        handler.removeCallbacks(tick);
+        handler.post(tick);
+    }
+
+    /**
+     * 端の帯は、ナビバーが隠れていてスワイプを待っているときだけタッチを受ける。
+     * 上端の帯は、ステータスバーも隠れているときだけ(上からのスワイプでもナビバーが出てくるため)。
+     */
+    private void updateCatchers() {
+        if (navCatcher == null) {
+            return;
+        }
+        boolean on = ticking && prefs.getBoolean(Prefs.EDGE_CATCH, true) && overlay.waitingForSwipe();
+        boolean guides = prefs.getBoolean(Prefs.GUIDES, false);
+        int size = Math.max(1, Math.round(prefs.getInt(Prefs.EDGE_CATCH_DP, Prefs.DEFAULT_EDGE_CATCH_DP)
+                * getResources().getDisplayMetrics().density));
+        EdgeCatcher.Edge edge;
+        switch (overlay.edgeSide()) {
+            case RIGHT:
+                edge = EdgeCatcher.Edge.RIGHT;
+                break;
+            case LEFT:
+                edge = EdgeCatcher.Edge.LEFT;
+                break;
+            default:
+                edge = EdgeCatcher.Edge.BOTTOM;
+                break;
+        }
+        navCatcher.apply(edge, on, size, guides);
+        topCatcher.apply(EdgeCatcher.Edge.TOP, on && overlay.statusBarHidden(), size, guides);
+    }
+
+    /** 端の帯1本分(窓とその置き場所)。使わないときもタッチを素通りさせて置いておく。 */
+    private final class Catcher {
+        final EdgeCatcher view;
+        final WindowManager.LayoutParams lp;
+        private String applied = "";
+
+        Catcher() {
+            view = new EdgeCatcher(NavOverlayService.this, NavOverlayService.this::onEdgeSwipe);
+            lp = new WindowManager.LayoutParams(1, 1,
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    PixelFormat.TRANSLUCENT);
+            lp.setFitInsetsTypes(0);
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+            lp.gravity = Gravity.BOTTOM | Gravity.START;
+            lp.setTitle("KipfelNavEdge");
+            windowManager.addView(view, lp);
+        }
+
+        void apply(EdgeCatcher.Edge edge, boolean active, int size, boolean guides) {
+            String state = edge + "/" + active + "/" + size + "/" + guides;
+            if (state.equals(applied)) {
+                return;
+            }
+            applied = state;
+            view.setEdge(edge);
+            int match = WindowManager.LayoutParams.MATCH_PARENT;
+            switch (edge) {
+                case TOP:
+                    lp.width = match;
+                    lp.height = size;
+                    lp.gravity = Gravity.TOP | Gravity.START;
+                    break;
+                case RIGHT:
+                    lp.width = size;
+                    lp.height = match;
+                    lp.gravity = Gravity.TOP | Gravity.END;
+                    break;
+                case LEFT:
+                    lp.width = size;
+                    lp.height = match;
+                    lp.gravity = Gravity.TOP | Gravity.START;
+                    break;
+                default:
+                    lp.width = match;
+                    lp.height = size;
+                    lp.gravity = Gravity.BOTTOM | Gravity.START;
+                    break;
+            }
+            if (active) {
+                lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+            } else {
+                lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+            }
+            // ガイド表示中は、タッチを受けている帯を赤く見せる
+            view.setBackgroundColor(active && guides ? Color.argb(110, 255, 40, 90) : Color.TRANSPARENT);
+            windowManager.updateViewLayout(view, lp);
+        }
+
+        void remove() {
+            windowManager.removeView(view);
+        }
     }
 
     /** 画面に出ているウィンドウの一覧(種類と位置を見るだけ)。取れなければ空。 */
@@ -194,6 +309,7 @@ public class NavOverlayService extends AccessibilityService {
         if (overlay != null) {
             overlay.setRunning(false);
         }
+        updateCatchers();
     }
 
     @Override
@@ -227,6 +343,12 @@ public class NavOverlayService extends AccessibilityService {
         if (overlay != null && windowManager != null) {
             windowManager.removeView(overlay);
             overlay = null;
+        }
+        if (navCatcher != null) {
+            navCatcher.remove();
+            topCatcher.remove();
+            navCatcher = null;
+            topCatcher = null;
         }
         super.onDestroy();
     }

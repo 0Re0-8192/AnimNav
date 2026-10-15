@@ -10,6 +10,7 @@ import android.graphics.Insets;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
@@ -17,6 +18,8 @@ import android.view.WindowMetrics;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Interpolator;
+import android.view.animation.PathInterpolator;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +35,8 @@ import java.util.Map;
  *   ウィンドウ一覧の両方で見る。スワイプで一時的に出したナビバーは前者では「隠れている」扱いに
  *   なるので、後者で拾う(後者は Android 側の都合で 0.2 秒ほど遅れて届く)。
  * - 消えるとき・出てくるときは、純正のナビバーのように外へ沈みながらフェードする。
+ * - 全画面のときは、画面の端の細い帯(EdgeCatcher)でスワイプを見つけた時点で、
+ *   バーと同じ動きで先に出し始める(先読み)。バーが出てこなければ引っ込める。
  * - ロック中(パスワード入力画面など)は、戻るだけを描く。
  * - キーボード表示中は、戻るの位置に「キーボードを閉じる」の絵を描く。
  */
@@ -42,6 +47,11 @@ class KipfelOverlayView extends View {
     private static final long FADE_MS = 220;
     // スワイプで出したバーが出入りするとき。位置はバー自体に合わせるので、フェードは短く
     private static final long QUICK_FADE_MS = 70;
+    // 先読み:Android がバーを出すときの動き(長さと緩急)に合わせて、外から滑り込ませる
+    private static final long PREDICT_SLIDE_MS = 275;
+    private static final Interpolator BAR_IN = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
+    // これまでにバーが出てこなければ空振りとして引っ込める
+    private static final long PREDICT_TIMEOUT_MS = 1000;
 
     private final WindowManager windowManager;
     private final KeyguardManager keyguardManager;
@@ -61,6 +71,10 @@ class KipfelOverlayView extends View {
     private String screen = Prefs.COVER;
     private boolean imeVisible;
     private boolean locked;
+    private boolean statusHidden;
+    // 隠れているナビバーが出てくる辺と太さ(null = ナビバーがない)
+    private Side hiddenSide;
+    private int hiddenThick;
     // 画面情報(WindowMetrics)から
     private Side metricsSide;          // null = ナビバーなし
     private int metricsThick;
@@ -77,6 +91,13 @@ class KipfelOverlayView extends View {
     private int thick;                 // ナビバーの本来の太さ
     private int slide;
     private final List<String> windowLines = new ArrayList<>();
+
+    // 先読み
+    private long predictStart;         // 0 = 先読みしていない
+    private boolean predictConfirmed;  // バーが本当に出てきた
+    private int predictHits;
+    private int predictMisses;
+    private int lateShows;             // 先読みできずに、ウィンドウ一覧で遅れて気づいた回数
 
     // 出てくる・消えるアニメーション(0 = 消えている、1 = 出ている)
     private float shown;
@@ -156,11 +177,15 @@ class KipfelOverlayView extends View {
         boolean wasWindowOnly = windowOnly;
         measure(windows);
         if (wasShown != shownNow) {
-            if (!shownNow && wasWindowOnly) {
+            if (shownNow && predictStart != 0) {
+                // 先読み:位置は時間から決める(currentSlide)ので、独自の浮き上がりはしない
+                animateShown(true, QUICK_FADE_MS, false);
+            } else if (!shownNow && wasWindowOnly) {
                 // スワイプで出したバーは、一覧から消えた時点でもう沈みきっている
                 animateShown(false, QUICK_FADE_MS, false);
             } else if (shownNow && windowOnly) {
                 // スワイプで出したバーは、バーの位置(slide)を追いかけるので、独自の浮き上がりはしない
+                lateShows++;
                 animateShown(true, QUICK_FADE_MS, false);
             } else {
                 animateShown(shownNow, FADE_MS, true);
@@ -169,9 +194,33 @@ class KipfelOverlayView extends View {
         invalidate();
     }
 
-    /** スワイプで出したバーが出ているあいだ。沈み始めを追いかけるために細かく見る。 */
+    /** スワイプで出したバーが出ているあいだと先読み中。バーの出入りを追いかけるために細かく見る。 */
     boolean trackingSwipeBar() {
-        return windowOnly;
+        return windowOnly || predictStart != 0;
+    }
+
+    /** 画面の端からのスワイプを見つけたとき。ナビバーが出てくるのに合わせて、先に出し始める。 */
+    void predictSwipe() {
+        if (shownNow || locked || hiddenSide == null) {
+            return;
+        }
+        predictStart = SystemClock.uptimeMillis();
+        predictConfirmed = false;
+    }
+
+    /** ナビバーが隠れていて、スワイプで出てくるのを待っている(端の帯を置いてよい)。 */
+    boolean waitingForSwipe() {
+        return !shownNow && !locked && !imeVisible && hiddenSide != null;
+    }
+
+    /** 隠れているナビバーが出てくる辺。 */
+    Side edgeSide() {
+        return hiddenSide != null ? hiddenSide : Side.BOTTOM;
+    }
+
+    /** ステータスバーも隠れている(上からのスワイプでもナビバーが出てくる)。 */
+    boolean statusBarHidden() {
+        return statusHidden;
     }
 
     /** ナビバーのある辺。消えていく途中は最後に見えていた辺。重ね描きの窓の置き場所に使う。 */
@@ -187,7 +236,12 @@ class KipfelOverlayView extends View {
         Insets navAll = in.getInsetsIgnoringVisibility(WindowInsets.Type.navigationBars());
         imeVisible = in.isVisible(WindowInsets.Type.ime());
         locked = keyguardManager.isKeyguardLocked();
+        statusHidden = in.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top > 0
+                && !in.isVisible(WindowInsets.Type.statusBars());
         screen = Prefs.screenFor(b.width(), b.height(), dp);
+        hiddenSide = navAll.bottom > 0 ? Side.BOTTOM : navAll.right > 0 ? Side.RIGHT
+                : navAll.left > 0 ? Side.LEFT : null;
+        hiddenThick = hiddenSide == null ? 0 : inset(navAll, hiddenSide);
 
         metricsSide = nav.bottom > 0 ? Side.BOTTOM : nav.right > 0 ? Side.RIGHT : nav.left > 0 ? Side.LEFT : null;
         metricsThick = metricsSide == null ? 0 : inset(nav, metricsSide);
@@ -205,20 +259,60 @@ class KipfelOverlayView extends View {
         }
         metricsShownBefore = metricsShown;
         windowOnly = !metricsShown && windowShown && !ignoreWindowUntilGone;
-        shownNow = metricsShown || windowOnly;
+        boolean predicting = updatePrediction(metricsShown || windowOnly);
+        shownNow = metricsShown || windowOnly || predicting;
 
-        if (shownNow) {
+        if (metricsShown || windowOnly) {
             side = metricsShown ? metricsSide : windowSide;
             // 本来の太さ。沈んでいく途中でウィンドウが縮んでも、絵の大きさは変えない
             thick = Math.max(inset(navAll, side), metricsShown ? metricsThick : windowThick);
+        } else if (predicting) {
+            side = hiddenSide;
+            thick = hiddenThick;
         }
         // 沈めた分は、スワイプで出したバーを追いかけているときだけ更新する。
-        // 消えていく途中は最後の値のままにして、元の位置に跳ね戻らないようにする
-        if (windowOnly) {
+        // 消えていく途中は最後の値のままにして、元の位置に跳ね戻らないようにする。
+        // 先読み中は、描くときに時間から決める
+        if (windowOnly && !predicting) {
             slide = windowSlide;
         } else if (shownNow) {
             slide = 0;
         }
+    }
+
+    /**
+     * 先読みを続けるか。バーが出てきたのを確かめて、滑り込みが終わったら、ふだんの判定に引き継ぐ。
+     * ウィンドウ一覧はバーが出きってから届くので、それまでは出ている扱いのまま待つ。
+     */
+    private boolean updatePrediction(boolean barSeen) {
+        if (predictStart == 0) {
+            return false;
+        }
+        long age = SystemClock.uptimeMillis() - predictStart;
+        if (barSeen) {
+            predictConfirmed = true;
+        }
+        if (predictConfirmed && age >= PREDICT_SLIDE_MS) {
+            predictHits++;
+            predictStart = 0;
+        } else if (!predictConfirmed && (age >= PREDICT_TIMEOUT_MS || locked || hiddenSide == null)) {
+            predictMisses++;
+            predictStart = 0;
+        }
+        return predictStart != 0;
+    }
+
+    /** 外へ沈んでいる量。先読み中は、バーと同じ動きで外から滑り込む。 */
+    private float currentSlide() {
+        if (predictStart == 0) {
+            return slide;
+        }
+        float t = (SystemClock.uptimeMillis() - predictStart) / (float) PREDICT_SLIDE_MS;
+        if (t >= 1f) {
+            return 0;
+        }
+        postInvalidateOnAnimation();
+        return thick * (1f - BAR_IN.getInterpolation(t));
     }
 
     private static int inset(Insets i, Side s) {
@@ -356,7 +450,7 @@ class KipfelOverlayView extends View {
         boolean snap = prefs.getBoolean(Prefs.PIXEL_SNAP, true);
 
         // 外へ沈む量:消えるときのアニメーション + スワイプで出したバーの沈み具合
-        float out = (sinkOnFade ? (1f - shown) * thick : 0) + slide;
+        float out = (sinkOnFade ? (1f - shown) * thick : 0) + currentSlide();
         int alpha = Math.round(255 * shown);
         c.save();
         switch (side) {
@@ -447,6 +541,8 @@ class KipfelOverlayView extends View {
         lines.add("画面情報 " + (metricsSide == null ? "なし" : metricsSide + " " + metricsThick + "px")
                 + " / ウィンドウ一覧 " + (windowSide == null ? "なし" : windowSide + " " + windowThick + "px")
                 + " / 本来 " + thick + "px / 沈み " + slide + "px" + (windowOnly ? " (スワイプ)" : ""));
+        lines.add("先読み 当たり " + predictHits + " / 空振り " + predictMisses + " / 間に合わず " + lateShows
+                + (predictStart != 0 ? "  (先読み中)" : ""));
         lines.addAll(windowLines);
         float lineH = text.getTextSize() * 1.3f;
         float maxW = 0;
