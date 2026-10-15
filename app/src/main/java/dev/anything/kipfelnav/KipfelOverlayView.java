@@ -460,6 +460,7 @@ class KipfelOverlayView extends View {
         float offset = Prefs.get(prefs, key, Prefs.OFFSET_Y) * dp;
         boolean backOnRight = prefs.getBoolean(Prefs.BACK_ON_RIGHT, false);
         boolean snap = prefs.getBoolean(Prefs.PIXEL_SNAP, true);
+        int enterStyle = prefs.getInt(Prefs.ENTER_STYLE, Prefs.ENTER_RIGHT_FIRST);
 
         // 外へ沈む量:消えるときのアニメーション + スワイプで出したバーの沈み具合
         float out = (sinkOnFade ? (1f - shown) * thick : 0) + currentSlide();
@@ -514,7 +515,7 @@ class KipfelOverlayView extends View {
             float along = center + (i - 1) * spacing;
             float cx;
             float cy;
-            float enterOff = enterOffset(i);
+            float enterOff = enterOffset(i, enterStyle);
             switch (side) {
                 case RIGHT:
                     cx = w - thick / 2f - offset;
@@ -531,11 +532,13 @@ class KipfelOverlayView extends View {
             }
             int half = Math.round(size / 2);
             // 横からのスライド:画面の外(右端 / 下端)から、いつもの位置まで
+            // (一列のときは、一番左(上)のボタンが外に出る距離を3つに共通で使う)
             if (enterOff > 0f) {
+                boolean row = enterStyle == Prefs.ENTER_ROW;
                 if (side == Side.BOTTOM) {
-                    cx += enterOff * (w - cx + half);
+                    cx += enterOff * (row ? w * (1f - (center - spacing)) + half : w - cx + half);
                 } else {
-                    cy += enterOff * (h - cy + half);
+                    cy += enterOff * (row ? h * (1f - (center - spacing)) + half : h - cy + half);
                 }
             }
             int x0 = Math.round(cx) - half;
@@ -553,18 +556,30 @@ class KipfelOverlayView extends View {
     }
 
     /** i 番目のボタンが、いつもの位置まであとどれだけ(1 = 画面の外、0 = 着いた)。 */
-    private float enterOffset(int i) {
+    private float enterOffset(int i, int style) {
         if (enterStart == 0) {
             return 0f;
         }
         long t = SystemClock.uptimeMillis() - enterStart;
-        if (t >= ENTER_MS + 2 * ENTER_STAGGER_MS) {
+        // 動き出しのずらし:右(下)から順 / 左(上)から順 / 一列(ずらさない)
+        long delay = style == Prefs.ENTER_LEFT_FIRST ? i * ENTER_STAGGER_MS
+                : style == Prefs.ENTER_ROW ? 0 : (2 - i) * ENTER_STAGGER_MS;
+        long total = ENTER_MS + (style == Prefs.ENTER_ROW ? 0 : 2 * ENTER_STAGGER_MS);
+        if (t >= total) {
             enterStart = 0;
             return 0f;
         }
         postInvalidateOnAnimation();
-        float u = (t - (2 - i) * ENTER_STAGGER_MS) / (float) ENTER_MS;
+        float u = (t - delay) / (float) ENTER_MS;
         return 1f - ENTER.getInterpolation(Math.max(0f, Math.min(1f, u)));
+    }
+
+    /** 設定画面の「出方を試す」。いまのナビバー上で、横からのスライドをやり直す。 */
+    void previewEnter() {
+        if (shownNow && shown > 0f) {
+            enterStart = SystemClock.uptimeMillis();
+            invalidate();
+        }
     }
 
     /** ガイド表示中の確認用の文字。 */

@@ -14,6 +14,8 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -93,6 +95,26 @@ public class MainActivity extends Activity {
             root.addView(row);
         }
         intSlider("PNG 連番・PNG の1コマの長さ", Prefs.FRAME_MS, Prefs.DEFAULT_FRAME_MS, 30, 600, v -> v + "ms");
+
+        heading("スワイプで出したときの入り方", 18);
+        text("全画面のアプリでスワイプしてナビバーを出すと、Android の都合でキプフェルはバーより遅れて、"
+                + "横から滑り込んで出ます。その入り方を選べます。「出方を試す」で、いまのナビバー上でやり直します。", 15);
+        RadioGroup enter = new RadioGroup(this);
+        String[] enterLabels = {"右のボタンから順に", "左のボタンから順に(並びを保って入ってくる)", "3つを一列のまま"};
+        int enterNow = prefs.getInt(Prefs.ENTER_STYLE, Prefs.ENTER_RIGHT_FIRST);
+        for (int i = 0; i < enterLabels.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setId(1000 + i);
+            rb.setText(enterLabels[i]);
+            rb.setChecked(i == enterNow);
+            enter.addView(rb);
+        }
+        enter.setOnCheckedChangeListener((g, id) -> {
+            prefs.edit().putInt(Prefs.ENTER_STYLE, id - 1000)
+                    .putLong(Prefs.ENTER_PREVIEW, System.currentTimeMillis()).apply();
+        });
+        root.addView(enter);
+        button("出方を試す", () -> prefs.edit().putLong(Prefs.ENTER_PREVIEW, System.currentTimeMillis()).apply());
 
         heading("3. 位置合わせ(" + (screen.startsWith(Prefs.MAIN) ? "開いた画面" : "閉じた画面")
                 + (sideways ? "・ナビバーが横" : "") + ")", 18);

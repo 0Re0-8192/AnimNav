@@ -65,6 +65,9 @@ public class NavOverlayService extends AccessibilityService {
         if (Prefs.GUIDES.equals(key)) {
             applyLayout();
         }
+        if (Prefs.ENTER_PREVIEW.equals(key)) {
+            overlay.previewEnter();
+        }
         if (Prefs.GUIDES.equals(key) || Prefs.EDGE_CATCH.equals(key) || Prefs.EDGE_CATCH_DP.equals(key)) {
             updateCatchers();
         }

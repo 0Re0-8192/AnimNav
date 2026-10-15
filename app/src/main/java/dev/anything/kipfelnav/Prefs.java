@@ -24,6 +24,11 @@ final class Prefs {
     static final String PIXEL_SNAP = "pixelSnap";       // 整数倍・整数分の1でドットをくっきり
     static final String FRAME_MS = "frameMs";           // PNG 連番の1コマの長さ
     static final String IMAGES_VERSION = "imagesVersion";
+    static final String ENTER_STYLE = "enterStyle";     // スワイプで出したバーに遅れて出るときの入り方
+    static final String ENTER_PREVIEW = "enterPreview"; // 設定画面から「出方を試す」(値は押した時刻)
+    static final int ENTER_RIGHT_FIRST = 0;  // 右(下)のボタンから順に
+    static final int ENTER_LEFT_FIRST = 1;   // 左(上)のボタンから順に
+    static final int ENTER_ROW = 2;          // 3つを一列のまま
     static final String EDGE_CATCH = "edgeCatch";       // 全画面で端からのスワイプを先読みする(実験。初期値はオフ)
     static final String EDGE_CATCH_DP = "edgeCatchDp";  // そのための帯の幅(dp)
 
