@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.18
+
+- Fix the images showing on the lock screen right after waking the screen (for
+  example with double-tap to wake): the overlay now forgets its state when the
+  screen turns off, and never treats a window-list-only bar as a swiped-in bar
+  while the device is locked.
+
 ## 0.17 — first public release
 
 Development before this version was private; this entry summarizes it.

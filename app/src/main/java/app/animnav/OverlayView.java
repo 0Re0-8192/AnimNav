@@ -270,7 +270,9 @@ class OverlayView extends View {
             ignoreWindowUntilGone = false;
         }
         metricsShownBefore = metricsShown;
-        windowOnly = !metricsShown && windowShown && !ignoreWindowUntilGone;
+        // ロック中は、ウィンドウ一覧だけに見えるバー(スワイプで出したバー)とは見なさない。
+        // 画面を点けた直後などに SystemUI のバーが一瞬一覧に出ても、描かない
+        windowOnly = !metricsShown && windowShown && !ignoreWindowUntilGone && !locked;
         boolean predicting = updatePrediction(metricsShown || windowOnly);
         shownNow = metricsShown || windowOnly || predicting;
 
@@ -574,6 +576,23 @@ class OverlayView extends View {
         postInvalidateOnAnimation();
         float u = (t - delay) / (float) ENTER_MS;
         return 1f - ENTER.getInterpolation(Math.max(0f, Math.min(1f, u)));
+    }
+
+    /** 画面が消えたとき。消える前の「出ている」状態を引きずって、点けた瞬間に描かないように戻す。 */
+    void resetForScreenOff() {
+        if (fade != null) {
+            fade.cancel();
+        }
+        shown = 0f;
+        shownNow = false;
+        windowOnly = false;
+        ignoreWindowUntilGone = false;
+        metricsShownBefore = false;
+        windowSide = null;
+        slide = 0;
+        predictStart = 0;
+        enterStart = 0;
+        invalidate();
     }
 
     /** 設定画面の「出方を試す」。いまのナビバー上で、横からのスライドをやり直す。 */

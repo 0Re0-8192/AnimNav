@@ -80,6 +80,9 @@ public class NavOverlayService extends AccessibilityService {
         public void onReceive(Context context, Intent intent) {
             if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
                 stopTicking();
+                if (overlay != null) {
+                    overlay.resetForScreenOff();
+                }
             } else {
                 startTicking();
             }
