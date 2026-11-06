@@ -1,11 +1,15 @@
 # Changelog
 
-## 0.18
+## 0.19
 
-- Fix the images showing on the lock screen right after waking the screen (for
-  example with double-tap to wake): the overlay now forgets its state when the
-  screen turns off, and never treats a window-list-only bar as a swiped-in bar
-  while the device is locked.
+- Fix the images showing over the always-on display (AOD) and on the lock
+  screen right after waking the screen (for example with double-tap to wake).
+  The overlay now watches the display state itself (not only the screen-off
+  broadcast, which doesn't always arrive for AOD), clears everything as soon as
+  the display leaves the "on" state, and doesn't draw while it is dozing.
+- While the device is locked, a bar that only the window list reports is no
+  longer treated as a swiped-in bar. The Back image on the password screen is
+  unchanged.
 
 ## 0.17 — first public release
 

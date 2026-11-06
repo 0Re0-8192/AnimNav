@@ -9,10 +9,12 @@ import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
@@ -74,6 +76,41 @@ public class NavOverlayService extends AccessibilityService {
         overlay.invalidate();
     };
 
+    // 常時表示(AOD)など、画面は点いているが「消灯扱い」の状態では、画面 OFF の通知が来ないことがある。
+    // 表示の状態そのものを見張って、ON 以外になったら描いているものを全部消す
+    private final DisplayManager.DisplayListener displayListener = new DisplayManager.DisplayListener() {
+        @Override
+        public void onDisplayAdded(int displayId) {
+        }
+
+        @Override
+        public void onDisplayRemoved(int displayId) {
+        }
+
+        @Override
+        public void onDisplayChanged(int displayId) {
+            checkDisplayState();
+        }
+    };
+
+    private void checkDisplayState() {
+        if (overlay == null) {
+            return;
+        }
+        Display d = overlay.getDisplay();
+        if (d == null) {
+            return;
+        }
+        if (d.getState() == Display.STATE_ON) {
+            if (!ticking && getSystemService(PowerManager.class).isInteractive()) {
+                startTicking();
+            }
+        } else if (ticking) {
+            stopTicking();
+            overlay.resetForScreenOff();
+        }
+    }
+
     // 画面が消えているあいだはアニメーションを止める
     private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
         @Override
@@ -123,6 +160,8 @@ public class NavOverlayService extends AccessibilityService {
         } else {
             registerReceiver(screenReceiver, f); // 画面の ON/OFF はシステムからの通知だけ
         }
+
+        getSystemService(DisplayManager.class).registerDisplayListener(displayListener, handler);
 
         if (getSystemService(PowerManager.class).isInteractive()) {
             startTicking();
@@ -346,6 +385,7 @@ public class NavOverlayService extends AccessibilityService {
     @Override
     public void onDestroy() {
         stopTicking();
+        getSystemService(DisplayManager.class).unregisterDisplayListener(displayListener);
         if (prefs != null) {
             prefs.unregisterOnSharedPreferenceChangeListener(prefsListener);
             unregisterReceiver(screenReceiver);

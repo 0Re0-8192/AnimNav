@@ -445,6 +445,10 @@ class OverlayView extends View {
 
     @Override
     protected void onDraw(Canvas c) {
+        android.view.Display display = getDisplay();
+        if (display != null && display.getState() != android.view.Display.STATE_ON) {
+            return; // 常時表示(AOD)や消灯中は描かない
+        }
         boolean guides = prefs.getBoolean(Prefs.GUIDES, false);
         if (shown > 0f && thick > 0) {
             drawButtons(c, guides);
