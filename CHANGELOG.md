@@ -2,6 +2,7 @@
 
 ## 0.19
 
+- Settings screen: removed the redundant explanations and shortened the labels.
 - Fix the images showing over the always-on display (AOD) and on the lock
   screen right after waking the screen (for example with double-tap to wake).
   The overlay now watches the display state itself (not only the screen-off

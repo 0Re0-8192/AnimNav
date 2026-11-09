@@ -41,7 +41,6 @@ public class MainActivity extends AppCompatActivity {
     private String screen;
     private boolean sideways;
     private TextView statusTitle;
-    private TextView statusHint;
     private MaterialCardView statusCard;
     private final EnumMap<Slot, SlotRow> rows = new EnumMap<>(Slot.class);
     private final EnumMap<Slot, ActivityResultLauncher<String[]>> pickers = new EnumMap<>(Slot.class);
@@ -95,14 +94,12 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         boolean on = isServiceEnabled();
         statusTitle.setText(on ? R.string.status_on : R.string.status_off);
-        statusHint.setText(on ? R.string.status_on_hint : R.string.status_off_hint);
         int bg = on ? com.google.android.material.R.attr.colorPrimaryContainer
                 : com.google.android.material.R.attr.colorErrorContainer;
         int fg = on ? com.google.android.material.R.attr.colorOnPrimaryContainer
                 : com.google.android.material.R.attr.colorOnErrorContainer;
         statusCard.setCardBackgroundColor(MaterialColors.getColor(statusCard, bg));
         statusTitle.setTextColor(MaterialColors.getColor(statusCard, fg));
-        statusHint.setTextColor(MaterialColors.getColor(statusCard, fg));
         refreshSlots();
     }
 
@@ -111,7 +108,6 @@ public class MainActivity extends AppCompatActivity {
     private void bindStatus() {
         statusCard = findViewById(R.id.statusCard);
         statusTitle = findViewById(R.id.statusTitle);
-        statusHint = findViewById(R.id.statusHint);
     }
 
     private void bindSetup() {
@@ -190,7 +186,7 @@ public class MainActivity extends AppCompatActivity {
             SlotRow r = rows.get(slot);
             SlotImage img = ImageStore.load(this, slot);
             if (img == null) {
-                r.desc.setText(slot == Slot.HIDE_KEYBOARD ? R.string.slot_not_set_hidekb : R.string.slot_not_set);
+                r.desc.setText(R.string.slot_not_set);
             } else {
                 r.desc.setText(img.describe(this));
             }

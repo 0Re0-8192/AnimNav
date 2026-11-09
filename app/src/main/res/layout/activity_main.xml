@@ -45,12 +45,6 @@
                     android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
-                <TextView
-                    android:id="@+id/statusHint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textAppearance="?attr/textAppearanceBodyMedium" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -123,14 +117,6 @@
                     android:text="@string/section_images"
                     android:textAppearance="?attr/textAppearanceTitleLarge" />
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/images_help"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
                 <LinearLayout
                     android:id="@+id/slotsContainer"
                     android:layout_width="match_parent"
@@ -178,14 +164,6 @@
                     android:layout_height="wrap_content"
                     android:text="@string/section_entrance"
                     android:textAppearance="?attr/textAppearanceTitleLarge" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/entrance_help"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
 
                 <com.google.android.material.button.MaterialButtonToggleGroup
                     android:id="@+id/enterGroup"
@@ -251,14 +229,6 @@
                     android:layout_height="wrap_content"
                     android:text="@string/section_position"
                     android:textAppearance="?attr/textAppearanceTitleLarge" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/position_help"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/swGuides"
