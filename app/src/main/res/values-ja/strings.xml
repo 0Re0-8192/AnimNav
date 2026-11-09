@@ -55,7 +55,7 @@
     <string name="btn_reset_pos">初期値に戻す</string>
 
     <string name="section_experimental">スワイプの先読み(実験)</string>
-    <string name="experimental_help">帯の中から始まるタッチは、アプリに届きません。</string>
+    <string name="experimental_help">画面の端から始まるタッチは、アプリに届きません。</string>
     <string name="sw_edge">有効</string>
     <string name="edge_width">帯の幅:%1$d dp(%2$d px)</string>
 

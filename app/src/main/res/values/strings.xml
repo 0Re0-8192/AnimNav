@@ -63,7 +63,7 @@
 
     <!-- Experimental -->
     <string name="section_experimental">Swipe prediction (experimental)</string>
-    <string name="experimental_help">Touches that start inside a strip don\'t reach the app.</string>
+    <string name="experimental_help">Touches that start at the screen edge don\'t reach the app.</string>
     <string name="sw_edge">Enabled</string>
     <string name="edge_width">Strip width: %1$d dp (%2$d px)</string>
 

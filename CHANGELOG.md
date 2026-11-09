@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20
+
+- Swipe prediction: say "screen edge" instead of "strip" in the explanation.
+
 ## 0.19
 
 - Settings screen: removed the redundant explanations and shortened the labels.
